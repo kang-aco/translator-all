@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>실시간 통번역기 — 채팅 번역</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #181b22;
+    --panel-2: #10131a;
+    --line: #2a2f3a;
+    --text: #e6e8ec;
+    --muted: #9aa3b2;
+    --accent: #6ea8fe;
+    --ok: #3ddc97;
+    --fail: #ff6b6b;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", "Malgun Gothic", system-ui, sans-serif;
+    line-height: 1.55;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--line);
+    background: var(--panel);
+    flex: 0 0 auto;
+  }
+  .title { font-size: 16px; font-weight: 700; margin: 0 0 10px; }
+
+  /* ── 언어 선택 줄 ── */
+  .langbar { display: flex; gap: 8px; align-items: center; }
+  select {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 9px 10px;
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+  }
+  select:focus { outline: none; border-color: var(--accent); }
+  #swapBtn {
+    flex: 0 0 auto;
+    width: 42px;
+    height: 38px;
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    font-size: 16px;
+    cursor: pointer;
+  }
+  #swapBtn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── 결과 목록 ── */
+  main {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 16px 18px;
+  }
+  .empty {
+    color: var(--muted);
+    font-size: 13.5px;
+    text-align: center;
+    margin-top: 40px;
+  }
+  .item {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: border-color .12s;
+  }
+  .item:hover { border-color: var(--accent); }
+  .item .orig {
+    color: var(--muted);
+    font-size: 12.5px;
+    margin-bottom: 6px;
+    word-break: break-word;
+  }
+  .item .trans {
+    font-size: 16px;
+    word-break: break-word;
+  }
+  .item .meta {
+    margin-top: 8px;
+    font-size: 11.5px;
+    color: var(--muted);
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .item.error { border-color: var(--fail); cursor: default; }
+  .item.error .trans { color: var(--fail); font-size: 14px; }
+  .item.pending { opacity: .6; cursor: default; }
+  .copied { color: var(--ok); }
+
+  /* ── 입력 줄 ── */
+  footer {
+    flex: 0 0 auto;
+    border-top: 1px solid var(--line);
+    background: var(--panel);
+    padding: 12px 18px 16px;
+  }
+  .inputbar { display: flex; gap: 8px; align-items: flex-end; }
+  textarea {
+    flex: 1 1 auto;
+    resize: none;
+    min-height: 44px;
+    max-height: 140px;
+    padding: 11px 12px;
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    font-size: 15px;
+    font-family: inherit;
+    line-height: 1.4;
+  }
+  textarea:focus { outline: none; border-color: var(--accent); }
+  #sendBtn {
+    flex: 0 0 auto;
+    height: 44px;
+    padding: 0 20px;
+    background: var(--accent);
+    color: #0f1115;
+    border: 0;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  #sendBtn:disabled { opacity: .5; cursor: default; }
+  .hint { font-size: 11.5px; color: var(--muted); margin-top: 7px; }
+  #status { font-size: 12px; margin-top: 6px; min-height: 16px; }
+  #status.err { color: var(--fail); }
+  #status.ok { color: var(--ok); }
+</style>
+</head>
+<body>
+
+<header>
+  <p class="title">채팅 번역</p>
+  <div class="langbar">
+    <select id="sourceLang" aria-label="원어"></select>
+    <button id="swapBtn" type="button" title="원어와 목표어 서로 바꾸기" aria-label="언어 바꾸기">⇄</button>
+    <select id="targetLang" aria-label="목표어"></select>
+  </div>
+</header>
+
+<main id="list">
+  <p class="empty" id="emptyMsg">아래에 글을 쓰고 <b>번역</b> 버튼이나 <b>Enter</b> 를 누르세요.<br>결과를 누르면 클립보드에 복사됩니다.</p>
+</main>
+
+<footer>
+  <div class="inputbar">
+    <textarea id="input" rows="1" placeholder="번역할 내용을 입력하세요" autocomplete="off"></textarea>
+    <button id="sendBtn" type="button">번역</button>
+  </div>
+  <div class="hint">Enter = 번역 · Shift+Enter = 줄바꿈</div>
+  <div id="status"></div>
+</footer>
+
+<script>
+'use strict';
+
+// ══════════════════════════════════════════════════════════
+//  1. 언어 목록
+// ══════════════════════════════════════════════════════════
+var LANGS = [
+  { code: 'ko', name: '한국어' },
+  { code: 'en', name: '영어' },
+  { code: 'ja', name: '일본어' },
+  { code: 'zh', name: '중국어(간체)' },
+  { code: 'es', name: '스페인어' },
+  { code: 'fr', name: '프랑스어' },
+  { code: 'de', name: '독일어' },
+  { code: 'ru', name: '러시아어' },
+  { code: 'pt', name: '포르투갈어' },
+  { code: 'it', name: '이탈리아어' },
+  { code: 'id', name: '인도네시아어' },
+  { code: 'nl', name: '네덜란드어' }
+];
+
+var sourceSel = document.getElementById('sourceLang');
+var targetSel = document.getElementById('targetLang');
+var inputEl   = document.getElementById('input');
+var sendBtn   = document.getElementById('sendBtn');
+var swapBtn   = document.getElementById('swapBtn');
+var listEl    = document.getElementById('list');
+var emptyMsg  = document.getElementById('emptyMsg');
+var statusEl  = document.getElementById('status');
+
+// 마지막으로 자동 감지된 원어. '자동 감지' 상태에서 ⇄ 를 눌렀을 때 씁니다.
+var lastDetected = null;
+
+function buildOptions() {
+  // 원어 쪽에는 '자동 감지'를 맨 위에 하나 더 넣습니다.
+  var autoOpt = document.createElement('option');
+  autoOpt.value = 'auto';
+  autoOpt.textContent = '자동 감지';
+  sourceSel.appendChild(autoOpt);
+
+  LANGS.forEach(function (lang) {
+    var a = document.createElement('option');
+    a.value = lang.code;
+    a.textContent = lang.name;
+    sourceSel.appendChild(a);
+
+    var b = document.createElement('option');
+    b.value = lang.code;
+    b.textContent = lang.name;
+    targetSel.appendChild(b);
+  });
+}
+
+function langName(code) {
+  if (code === 'auto') return '자동 감지';
+  for (var i = 0; i < LANGS.length; i++) {
+    if (LANGS[i].code === code) return LANGS[i].name;
+  }
+  return code;
+}
+
+// ══════════════════════════════════════════════════════════
+//  2. 언어 선택 기억하기 (localStorage)
+//     API 키는 서버 환경변수에 있으므로 여기에 저장할 것이 없습니다.
+// ══════════════════════════════════════════════════════════
+var PREF_KEY = 'translator.langPair';
+
+function loadPref() {
+  try {
+    var raw = localStorage.getItem(PREF_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (e) {
+    return null; // 저장소를 막아둔 브라우저에서도 앱이 죽지 않게
+  }
+}
+
+function savePref() {
+  try {
+    localStorage.setItem(PREF_KEY, JSON.stringify({
+      source: sourceSel.value,
+      target: targetSel.value
+    }));
+  } catch (e) { /* 저장 실패는 무시 */ }
+}
+
+// ══════════════════════════════════════════════════════════
+//  3. 화면에 상태 문구 보여주기
+// ══════════════════════════════════════════════════════════
+var statusTimer = null;
+function setStatus(msg, kind) {
+  statusEl.textContent = msg || '';
+  statusEl.className = kind || '';
+  if (statusTimer) clearTimeout(statusTimer);
+  if (msg) {
+    statusTimer = setTimeout(function () {
+      statusEl.textContent = '';
+      statusEl.className = '';
+    }, 4000);
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+//  4. 결과 카드 만들기
+// ══════════════════════════════════════════════════════════
+function nowLabel() {
+  var d = new Date();
+  return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+
+function addCard(originalText) {
+  if (emptyMsg) { emptyMsg.remove(); emptyMsg = null; }
+
+  var card = document.createElement('div');
+  card.className = 'item pending';
+
+  var orig = document.createElement('div');
+  orig.className = 'orig';
+  orig.textContent = originalText;
+
+  var trans = document.createElement('div');
+  trans.className = 'trans';
+  trans.textContent = '번역 중…';
+
+  var meta = document.createElement('div');
+  meta.className = 'meta';
+
+  card.appendChild(orig);
+  card.appendChild(trans);
+  card.appendChild(meta);
+
+  // 최신 결과가 위로 오게 맨 앞에 넣습니다.
+  listEl.insertBefore(card, listEl.firstChild);
+  listEl.scrollTop = 0;
+
+  return { card: card, trans: trans, meta: meta };
+}
+
+function fillSuccess(refs, data) {
+  refs.card.className = 'item';
+  refs.trans.textContent = data.translated;
+
+  var bits = [nowLabel(), '엔진: ' + data.engine];
+  if (data.detectedSource) bits.push('감지: ' + langName(data.detectedSource));
+  bits.push('→ ' + langName(data.target));
+  if (data.fallbackFrom) bits.push('(' + data.fallbackFrom + ' 실패로 대체)');
+  refs.meta.textContent = bits.join(' · ');
+
+  // 카드를 누르면 번역문을 복사
+  refs.card.addEventListener('click', function () {
+    copyText(data.translated, refs.meta);
+  });
+}
+
+function fillError(refs, message) {
+  refs.card.className = 'item error';
+  refs.trans.textContent = '번역 실패: ' + message;
+  refs.meta.textContent = nowLabel() + ' · 입력은 그대로 두었으니 다시 시도해 보세요.';
+}
+
+// ══════════════════════════════════════════════════════════
+//  5. 클립보드 복사
+//     navigator.clipboard 는 https 또는 localhost 에서만 동작합니다.
+//     안 되는 환경을 위해 옛날 방식도 준비해 둡니다.
+// ══════════════════════════════════════════════════════════
+function flashCopied(metaEl) {
+  var original = metaEl.textContent;
+  metaEl.textContent = '복사했습니다';
+  metaEl.classList.add('copied');
+  setTimeout(function () {
+    metaEl.textContent = original;
+    metaEl.classList.remove('copied');
+  }, 1200);
+}
+
+function legacyCopy(text) {
+  var ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  var ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+  document.body.removeChild(ta);
+  return ok;
+}
+
+async function copyText(text, metaEl) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      flashCopied(metaEl);
+      return;
+    }
+    if (legacyCopy(text)) flashCopied(metaEl);
+    else setStatus('복사에 실패했습니다. 직접 선택해서 복사해 주세요.', 'err');
+  } catch (e) {
+    setStatus('복사에 실패했습니다: ' + e.message, 'err');
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+//  6. 번역 요청
+//     키는 서버(Pages Function)가 갖고 있으므로
+//     브라우저는 우리 사이트 안의 /api/translate 만 부릅니다.
+// ══════════════════════════════════════════════════════════
+var busy = false;
+
+async function translate() {
+  if (busy) return;
+
+  var text = inputEl.value.trim();
+  if (!text) { setStatus('번역할 내용을 입력해 주세요.', 'err'); return; }
+
+  var source = sourceSel.value;
+  var target = targetSel.value;
+  if (source === target) { setStatus('원어와 목표어가 같습니다.', 'err'); return; }
+
+  busy = true;
+  sendBtn.disabled = true;
+  sendBtn.textContent = '…';
+
+  var refs = addCard(text);
+  inputEl.value = '';
+  autoGrow();
+
+  try {
+    var res = await fetch('/api/translate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: text, source: source, target: target })
+    });
+
+    var data;
+    try {
+      data = await res.json();
+    } catch (parseErr) {
+      throw new Error('서버 응답을 읽지 못했습니다 (HTTP ' + res.status + ').');
+    }
+
+    if (!res.ok || data.error) {
+      throw new Error(data.error || ('서버 오류 HTTP ' + res.status));
+    }
+
+    lastDetected = data.detectedSource || null;
+    fillSuccess(refs, data);
+  } catch (err) {
+    // 여기서 잡아주기 때문에 실패해도 화면은 계속 동작합니다.
+    fillError(refs, (err && err.message) ? err.message : '알 수 없는 오류');
+    inputEl.value = text; // 다시 시도할 수 있게 입력을 되돌려 줍니다.
+    autoGrow();
+  } finally {
+    busy = false;
+    sendBtn.disabled = false;
+    sendBtn.textContent = '번역';
+    inputEl.focus();
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+//  7. 입력창 높이 자동 조절
+// ══════════════════════════════════════════════════════════
+function autoGrow() {
+  inputEl.style.height = 'auto';
+  inputEl.style.height = Math.min(inputEl.scrollHeight, 140) + 'px';
+}
+
+// ══════════════════════════════════════════════════════════
+//  8. 이벤트 연결
+// ══════════════════════════════════════════════════════════
+function swapLangs() {
+  var s = sourceSel.value;
+  var t = targetSel.value;
+
+  if (s === 'auto') {
+    // 자동 감지 상태에서는 바꿀 '원어'가 정해져 있지 않습니다.
+    // 직전에 감지된 언어가 있으면 그것을 사용합니다.
+    if (!lastDetected) {
+      setStatus('자동 감지 상태입니다. 한 번 번역한 뒤에 바꾸거나, 원어를 직접 골라 주세요.', 'err');
+      return;
+    }
+    sourceSel.value = t;
+    targetSel.value = lastDetected;
+  } else {
+    sourceSel.value = t;
+    targetSel.value = s;
+  }
+  savePref();
+  setStatus(langName(sourceSel.value) + ' → ' + langName(targetSel.value), 'ok');
+}
+
+sendBtn.addEventListener('click', translate);
+swapBtn.addEventListener('click', swapLangs);
+sourceSel.addEventListener('change', savePref);
+targetSel.addEventListener('change', savePref);
+
+inputEl.addEventListener('input', autoGrow);
+
+// Enter 로 번역. Shift+Enter 는 줄바꿈.
+// 한글 조합 중(isComposing)에는 무시해야 글자가 잘리지 않습니다.
+inputEl.addEventListener('keydown', function (e) {
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+    e.preventDefault();
+    translate();
+  }
+});
+
+// ══════════════════════════════════════════════════════════
+//  9. 시작
+// ══════════════════════════════════════════════════════════
+(function init() {
+  buildOptions();
+
+  var pref = loadPref();
+  sourceSel.value = (pref && pref.source) || 'auto';
+  targetSel.value = (pref && pref.target) || 'ko';
+
+  // 저장된 값이 목록에 없으면 기본값으로 되돌립니다.
+  if (!sourceSel.value) sourceSel.value = 'auto';
+  if (!targetSel.value) targetSel.value = 'ko';
+
+  autoGrow();
+  inputEl.focus();
+})();
+</script>
+</body>
+</html>

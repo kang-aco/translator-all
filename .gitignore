@@ -1,0 +1,9 @@
+# 로컬 개발 찌꺼기
+.wrangler/
+node_modules/
+
+# API 키가 들어가는 파일 — 절대 올리지 말 것
+.dev.vars
+.env
+.env.*
+*.key
