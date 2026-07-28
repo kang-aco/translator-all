@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>실시간 통번역기 — 채팅 번역</title>
+<title>실시간 통번역기</title>
 <style>
+  /* ══ 색깔 모음. body 에 light 클래스가 붙으면 밝은 테마로 바뀝니다 ══ */
   :root {
     --bg: #0f1115;
     --panel: #181b22;
@@ -12,10 +13,26 @@
     --line: #2a2f3a;
     --text: #e6e8ec;
     --muted: #9aa3b2;
+    --final: #ffffff;   /* 확정된 자막 — 가장 진하게 */
+    --interim: #6f7787; /* 중간 결과 — 흐리게 */
     --accent: #6ea8fe;
     --ok: #3ddc97;
     --fail: #ff6b6b;
   }
+  body.light {
+    --bg: #f4f5f7;
+    --panel: #ffffff;
+    --panel-2: #f0f1f4;
+    --line: #d7dae1;
+    --text: #1c1f26;
+    --muted: #6b7280;
+    --final: #000000;   /* 밝은 테마에서는 진한 검정 */
+    --interim: #a2a8b4;
+    --accent: #2563eb;
+    --ok: #087443;
+    --fail: #c92a2a;
+  }
+
   * { box-sizing: border-box; }
   html, body { height: 100%; }
   body {
@@ -26,18 +43,42 @@
     line-height: 1.55;
     display: flex;
     flex-direction: column;
+    transition: background .15s, color .15s;
   }
 
+  /* ══ 상단 ══ */
   header {
-    padding: 14px 18px;
-    border-bottom: 1px solid var(--line);
-    background: var(--panel);
     flex: 0 0 auto;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+    padding: 10px 16px 12px;
   }
-  .title { font-size: 16px; font-weight: 700; margin: 0 0 10px; }
+  .tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  .tab {
+    flex: 1 1 0;
+    padding: 9px 0;
+    background: var(--panel-2);
+    color: var(--muted);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
 
-  /* ── 언어 선택 줄 ── */
   .langbar { display: flex; gap: 8px; align-items: center; }
+  .langbar.hidden { display: none; }
   select {
     flex: 1 1 0;
     min-width: 0;
@@ -52,8 +93,7 @@
   select:focus { outline: none; border-color: var(--accent); }
   #swapBtn {
     flex: 0 0 auto;
-    width: 42px;
-    height: 38px;
+    width: 42px; height: 38px;
     background: var(--panel-2);
     color: var(--text);
     border: 1px solid var(--line);
@@ -63,18 +103,53 @@
   }
   #swapBtn:hover { border-color: var(--accent); color: var(--accent); }
 
-  /* ── 결과 목록 ── */
-  main {
-    flex: 1 1 auto;
-    overflow-y: auto;
-    padding: 16px 18px;
+  /* ══ 가운데 ══ */
+  main { flex: 1 1 auto; overflow-y: auto; padding: 14px 16px; }
+  .view { display: none; }
+  .view.active { display: block; }
+  .empty { color: var(--muted); font-size: 13.5px; text-align: center; margin-top: 40px; }
+
+  /* ── 자막 ── */
+  .caption {
+    border-bottom: 1px solid var(--line);
+    padding: 12px 4px;
   }
-  .empty {
-    color: var(--muted);
-    font-size: 13.5px;
-    text-align: center;
-    margin-top: 40px;
+  .caption:last-of-type { border-bottom: 0; }
+  .caption .src {
+    color: var(--final);
+    font-weight: 600;
+    word-break: break-word;
   }
+  .caption .dst {
+    color: var(--accent);
+    margin-top: 5px;
+    word-break: break-word;
+    cursor: pointer;
+  }
+  .caption .dst.waiting { color: var(--muted); font-style: italic; cursor: default; }
+  .caption .dst.failed  { color: var(--fail); cursor: default; }
+  .caption .when { color: var(--muted); font-size: 11.5px; margin-top: 5px; }
+
+  /* 중간 결과 — 아직 확정되지 않은 말. 흐린 회색 */
+  #interim {
+    color: var(--interim);
+    padding: 12px 4px;
+    word-break: break-word;
+    min-height: 1.6em;
+  }
+  #interim:empty { display: none; }
+
+  /* 자막 글자 크기 (설정에서 바뀝니다) */
+  body[data-capsize="s"] .caption .src, body[data-capsize="s"] #interim { font-size: 15px; }
+  body[data-capsize="s"] .caption .dst { font-size: 14px; }
+  body[data-capsize="m"] .caption .src, body[data-capsize="m"] #interim { font-size: 19px; }
+  body[data-capsize="m"] .caption .dst { font-size: 17px; }
+  body[data-capsize="l"] .caption .src, body[data-capsize="l"] #interim { font-size: 24px; }
+  body[data-capsize="l"] .caption .dst { font-size: 21px; }
+  body[data-capsize="xl"] .caption .src, body[data-capsize="xl"] #interim { font-size: 31px; }
+  body[data-capsize="xl"] .caption .dst { font-size: 26px; }
+
+  /* ── 채팅 카드 ── */
   .item {
     background: var(--panel);
     border: 1px solid var(--line);
@@ -82,45 +157,63 @@
     padding: 12px 14px;
     margin-bottom: 10px;
     cursor: pointer;
-    transition: border-color .12s;
   }
   .item:hover { border-color: var(--accent); }
-  .item .orig {
-    color: var(--muted);
-    font-size: 12.5px;
-    margin-bottom: 6px;
-    word-break: break-word;
-  }
-  .item .trans {
-    font-size: 16px;
-    word-break: break-word;
-  }
-  .item .meta {
-    margin-top: 8px;
-    font-size: 11.5px;
-    color: var(--muted);
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-  }
+  .item .orig { color: var(--muted); font-size: 12.5px; margin-bottom: 6px; word-break: break-word; }
+  .item .trans { font-size: 16px; word-break: break-word; }
+  .item .meta { margin-top: 8px; font-size: 11.5px; color: var(--muted); }
   .item.error { border-color: var(--fail); cursor: default; }
   .item.error .trans { color: var(--fail); font-size: 14px; }
   .item.pending { opacity: .6; cursor: default; }
   .copied { color: var(--ok); }
 
-  /* ── 입력 줄 ── */
+  /* ── 설정 ── */
+  .setting {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 13px 15px;
+    margin-bottom: 10px;
+  }
+  .setting h3 { margin: 0 0 3px; font-size: 14px; }
+  .setting p { margin: 0 0 10px; font-size: 12.5px; color: var(--muted); }
+  .setting .controls { display: flex; gap: 7px; flex-wrap: wrap; }
+  .chip {
+    padding: 7px 14px;
+    background: var(--panel-2);
+    color: var(--muted);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+  }
+  .chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .gauge {
+    height: 8px;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    overflow: hidden;
+    margin: 8px 0 6px;
+  }
+  .gauge > span { display: block; height: 100%; background: var(--ok); width: 0; }
+  .gauge.high > span { background: var(--fail); }
+
+  /* ══ 아래 ══ */
   footer {
     flex: 0 0 auto;
-    border-top: 1px solid var(--line);
     background: var(--panel);
-    padding: 12px 18px 16px;
+    border-top: 1px solid var(--line);
+    padding: 12px 16px 14px;
   }
-  .inputbar { display: flex; gap: 8px; align-items: flex-end; }
+  .bar { display: none; }
+  .bar.active { display: flex; gap: 8px; align-items: flex-end; }
+
   textarea {
     flex: 1 1 auto;
     resize: none;
-    min-height: 44px;
-    max-height: 140px;
+    min-height: 44px; max-height: 140px;
     padding: 11px 12px;
     background: var(--panel-2);
     color: var(--text);
@@ -131,163 +224,370 @@
     line-height: 1.4;
   }
   textarea:focus { outline: none; border-color: var(--accent); }
-  #sendBtn {
+
+  .btn {
     flex: 0 0 auto;
     height: 44px;
-    padding: 0 20px;
+    padding: 0 18px;
     background: var(--accent);
-    color: #0f1115;
+    color: #fff;
     border: 0;
     border-radius: 8px;
     font-size: 15px;
     font-weight: 700;
-    cursor: pointer;
     font-family: inherit;
+    cursor: pointer;
   }
-  #sendBtn:disabled { opacity: .5; cursor: default; }
+  .btn.sub {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--line);
+    font-weight: 600;
+  }
+  .btn.rec { background: var(--fail); }
+  .btn:disabled { opacity: .45; cursor: default; }
+  #speakBar .btn { flex: 1 1 0; }
+
   .hint { font-size: 11.5px; color: var(--muted); margin-top: 7px; }
-  #status { font-size: 12px; margin-top: 6px; min-height: 16px; }
+  #status { font-size: 12px; margin-top: 6px; min-height: 17px; }
   #status.err { color: var(--fail); }
   #status.ok { color: var(--ok); }
+
+  /* 녹음 중 표시등 */
+  .dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--fail);
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+  .dot.blink { animation: blink 1.1s infinite; }
+  @keyframes blink { 0%,100% { opacity: 1 } 50% { opacity: .25 } }
 </style>
 </head>
-<body>
+<body data-capsize="m">
 
 <header>
-  <p class="title">채팅 번역</p>
-  <div class="langbar">
+  <div class="tabs">
+    <button class="tab active" type="button" data-mode="speak">말하기</button>
+    <button class="tab"        type="button" data-mode="chat">채팅</button>
+    <button class="tab"        type="button" data-mode="settings">설정</button>
+  </div>
+  <div class="langbar" id="langbar">
     <select id="sourceLang" aria-label="원어"></select>
     <button id="swapBtn" type="button" title="원어와 목표어 서로 바꾸기" aria-label="언어 바꾸기">⇄</button>
     <select id="targetLang" aria-label="목표어"></select>
   </div>
 </header>
 
-<main id="list">
-  <p class="empty" id="emptyMsg">아래에 글을 쓰고 <b>번역</b> 버튼이나 <b>Enter</b> 를 누르세요.<br>결과를 누르면 클립보드에 복사됩니다.</p>
+<main>
+  <!-- ── 말하기 ── -->
+  <section class="view active" id="view-speak">
+    <p class="empty" id="speakEmpty">원어를 고르고 <b>시작</b>을 누른 뒤 말해 보세요.</p>
+    <div id="captions"></div>
+    <div id="interim"></div>
+  </section>
+
+  <!-- ── 채팅 ── -->
+  <section class="view" id="view-chat">
+    <p class="empty" id="chatEmpty">글을 쓰고 <b>번역</b> 또는 <b>Enter</b> 를 누르세요.<br>결과를 누르면 복사됩니다.</p>
+    <div id="chatList"></div>
+  </section>
+
+  <!-- ── 설정 ── -->
+  <section class="view" id="view-settings">
+    <div class="setting">
+      <h3>화면 테마</h3>
+      <p>자막을 밝은 배경에 진한 검정으로 보고 싶으면 밝게를 고르세요.</p>
+      <div class="controls" id="themeCtl">
+        <button class="chip" type="button" data-theme="dark">어둡게</button>
+        <button class="chip" type="button" data-theme="light">밝게</button>
+      </div>
+    </div>
+
+    <div class="setting">
+      <h3>자막 글자 크기</h3>
+      <p>화면을 멀리 두고 볼 때는 크게 하세요.</p>
+      <div class="controls" id="sizeCtl">
+        <button class="chip" type="button" data-size="s">작게</button>
+        <button class="chip" type="button" data-size="m">보통</button>
+        <button class="chip" type="button" data-size="l">크게</button>
+        <button class="chip" type="button" data-size="xl">아주 크게</button>
+      </div>
+    </div>
+
+    <div class="setting">
+      <h3>중간 결과 표시</h3>
+      <p>말하는 도중의 잠정 인식 결과를 흐린 글씨로 미리 보여줍니다. 번역은 하지 않습니다.</p>
+      <div class="controls" id="interimCtl">
+        <button class="chip" type="button" data-interim="on">켜기</button>
+        <button class="chip" type="button" data-interim="off">끄기</button>
+      </div>
+    </div>
+
+    <div class="setting">
+      <h3>말하기 모드 자동 번역</h3>
+      <p>끄면 원문 자막만 나오고 번역 API를 부르지 않습니다. 할당량을 아낄 때 쓰세요.</p>
+      <div class="controls" id="autoTrCtl">
+        <button class="chip" type="button" data-autotr="on">켜기</button>
+        <button class="chip" type="button" data-autotr="off">끄기</button>
+      </div>
+    </div>
+
+    <div class="setting">
+      <h3>오늘 번역에 보낸 글자 수</h3>
+      <p>이 기기에서 센 대략치입니다. 서버가 세는 실제 값과 다를 수 있습니다.</p>
+      <div class="gauge" id="usageGauge"><span></span></div>
+      <p id="usageText" style="margin-bottom:10px">0 자</p>
+      <div class="controls">
+        <button class="chip" type="button" id="resetUsage">숫자 초기화</button>
+      </div>
+    </div>
+
+    <div class="setting">
+      <h3>저장된 설정 지우기</h3>
+      <p>언어 선택, 테마, 글자 크기 등 이 브라우저에 기억된 값을 모두 지웁니다.</p>
+      <div class="controls">
+        <button class="chip" type="button" id="resetPrefs">모두 지우기</button>
+      </div>
+    </div>
+  </section>
 </main>
 
 <footer>
-  <div class="inputbar">
-    <textarea id="input" rows="1" placeholder="번역할 내용을 입력하세요" autocomplete="off"></textarea>
-    <button id="sendBtn" type="button">번역</button>
+  <!-- 말하기 모드 버튼 줄 -->
+  <div class="bar active" id="speakBar">
+    <button class="btn" type="button" id="startBtn">시작</button>
+    <button class="btn rec" type="button" id="stopBtn" disabled>정지</button>
+    <button class="btn sub" type="button" id="clearBtn">지우기</button>
   </div>
-  <div class="hint">Enter = 번역 · Shift+Enter = 줄바꿈</div>
+
+  <!-- 채팅 모드 입력 줄 -->
+  <div class="bar" id="chatBar">
+    <textarea id="input" rows="1" placeholder="번역할 내용을 입력하세요" autocomplete="off"></textarea>
+    <button class="btn" type="button" id="sendBtn">번역</button>
+  </div>
+
+  <div class="hint" id="hint">마이크는 시작을 누른 동안에만 켜집니다.</div>
   <div id="status"></div>
 </footer>
 
 <script>
 'use strict';
 
-// ══════════════════════════════════════════════════════════
-//  1. 언어 목록
-// ══════════════════════════════════════════════════════════
+/* ══════════════════════════════════════════════════════════
+   0. 설정값 — 여기 숫자만 바꿔도 동작이 달라집니다
+   ══════════════════════════════════════════════════════════ */
+var TRANSLATE_DEBOUNCE_MS = 500;   // 확정 문장이 멎고 이만큼 지나면 번역
+var RESTART_DELAY_MS      = 200;   // 인식이 끊겼을 때 다시 켜기까지 간격
+var NETWORK_RETRY_MS      = 3000;  // 네트워크 오류일 때 다시 켜기까지 간격
+var MAX_RESTART_FAILS     = 3;     // 연속 재시작 실패 허용 횟수
+var MAX_NETWORK_FAILS     = 3;     // 연속 네트워크 오류 허용 횟수
+var MIN_CHARS_TO_TRANSLATE = 2;    // 공백 뺀 글자가 이보다 적으면 번역 안 함
+var DAILY_CHAR_BUDGET     = 15000; // 설정 화면 게이지 기준값
+
+/* ══════════════════════════════════════════════════════════
+   1. 언어 목록
+   speech 항목은 음성 인식에 넘길 코드입니다.
+   음성 인식은 "무슨 언어인지" 미리 알려줘야 하므로
+   자동 감지를 쓸 수 없습니다.
+   ══════════════════════════════════════════════════════════ */
 var LANGS = [
-  { code: 'ko', name: '한국어' },
-  { code: 'en', name: '영어' },
-  { code: 'ja', name: '일본어' },
-  { code: 'zh', name: '중국어(간체)' },
-  { code: 'es', name: '스페인어' },
-  { code: 'fr', name: '프랑스어' },
-  { code: 'de', name: '독일어' },
-  { code: 'ru', name: '러시아어' },
-  { code: 'pt', name: '포르투갈어' },
-  { code: 'it', name: '이탈리아어' },
-  { code: 'id', name: '인도네시아어' },
-  { code: 'nl', name: '네덜란드어' }
+  { code: 'ko', name: '한국어',       speech: 'ko-KR' },
+  { code: 'en', name: '영어',         speech: 'en-US' },
+  { code: 'ja', name: '일본어',       speech: 'ja-JP' },
+  { code: 'zh', name: '중국어(간체)', speech: 'zh-CN' },
+  { code: 'es', name: '스페인어',     speech: 'es-ES' },
+  { code: 'fr', name: '프랑스어',     speech: 'fr-FR' },
+  { code: 'de', name: '독일어',       speech: 'de-DE' },
+  { code: 'ru', name: '러시아어',     speech: 'ru-RU' },
+  { code: 'pt', name: '포르투갈어',   speech: 'pt-BR' },
+  { code: 'it', name: '이탈리아어',   speech: 'it-IT' },
+  { code: 'id', name: '인도네시아어', speech: 'id-ID' },
+  { code: 'nl', name: '네덜란드어',   speech: 'nl-NL' }
 ];
-
-var sourceSel = document.getElementById('sourceLang');
-var targetSel = document.getElementById('targetLang');
-var inputEl   = document.getElementById('input');
-var sendBtn   = document.getElementById('sendBtn');
-var swapBtn   = document.getElementById('swapBtn');
-var listEl    = document.getElementById('list');
-var emptyMsg  = document.getElementById('emptyMsg');
-var statusEl  = document.getElementById('status');
-
-// 마지막으로 자동 감지된 원어. '자동 감지' 상태에서 ⇄ 를 눌렀을 때 씁니다.
-var lastDetected = null;
-
-function buildOptions() {
-  // 원어 쪽에는 '자동 감지'를 맨 위에 하나 더 넣습니다.
-  var autoOpt = document.createElement('option');
-  autoOpt.value = 'auto';
-  autoOpt.textContent = '자동 감지';
-  sourceSel.appendChild(autoOpt);
-
-  LANGS.forEach(function (lang) {
-    var a = document.createElement('option');
-    a.value = lang.code;
-    a.textContent = lang.name;
-    sourceSel.appendChild(a);
-
-    var b = document.createElement('option');
-    b.value = lang.code;
-    b.textContent = lang.name;
-    targetSel.appendChild(b);
-  });
-}
 
 function langName(code) {
   if (code === 'auto') return '자동 감지';
-  for (var i = 0; i < LANGS.length; i++) {
-    if (LANGS[i].code === code) return LANGS[i].name;
-  }
+  for (var i = 0; i < LANGS.length; i++) if (LANGS[i].code === code) return LANGS[i].name;
   return code;
 }
+function speechTag(code) {
+  for (var i = 0; i < LANGS.length; i++) if (LANGS[i].code === code) return LANGS[i].speech;
+  return null;
+}
 
-// ══════════════════════════════════════════════════════════
-//  2. 언어 선택 기억하기 (localStorage)
-//     API 키는 서버 환경변수에 있으므로 여기에 저장할 것이 없습니다.
-// ══════════════════════════════════════════════════════════
-var PREF_KEY = 'translator.langPair';
+/* ══════════════════════════════════════════════════════════
+   2. 화면 요소 모아두기
+   ══════════════════════════════════════════════════════════ */
+var $ = function (id) { return document.getElementById(id); };
 
-function loadPref() {
+var sourceSel = $('sourceLang'), targetSel = $('targetLang'), swapBtn = $('swapBtn');
+var langbar   = $('langbar');
+var captionsEl = $('captions'), interimEl = $('interim'), speakEmpty = $('speakEmpty');
+var chatListEl = $('chatList'), chatEmpty = $('chatEmpty');
+var inputEl = $('input'), sendBtn = $('sendBtn');
+var startBtn = $('startBtn'), stopBtn = $('stopBtn'), clearBtn = $('clearBtn');
+var statusEl = $('status'), hintEl = $('hint');
+
+/* ══════════════════════════════════════════════════════════
+   3. 사용자 설정 저장/불러오기 (localStorage)
+      API 키는 서버 환경변수에 있으므로 여기 저장할 것이 없습니다.
+   ══════════════════════════════════════════════════════════ */
+var PREF_KEY = 'translator.prefs';
+
+var prefs = {
+  source: 'ko',
+  target: 'en',
+  theme: 'dark',
+  capsize: 'm',
+  showInterim: true,
+  autoTranslate: true
+};
+
+function loadPrefs() {
   try {
     var raw = localStorage.getItem(PREF_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw);
-  } catch (e) {
-    return null; // 저장소를 막아둔 브라우저에서도 앱이 죽지 않게
-  }
+    if (!raw) return;
+    var saved = JSON.parse(raw);
+    for (var k in prefs) {
+      if (Object.prototype.hasOwnProperty.call(saved, k)) prefs[k] = saved[k];
+    }
+  } catch (e) { /* 저장소를 막아둔 브라우저에서도 앱이 죽지 않게 */ }
+}
+function savePrefs() {
+  try { localStorage.setItem(PREF_KEY, JSON.stringify(prefs)); } catch (e) {}
 }
 
-function savePref() {
+/* ── 오늘 번역에 보낸 글자 수 ── */
+var USAGE_KEY = 'translator.usage';
+function todayStamp() {
+  var d = new Date();
+  return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+}
+function loadUsage() {
   try {
-    localStorage.setItem(PREF_KEY, JSON.stringify({
-      source: sourceSel.value,
-      target: targetSel.value
-    }));
-  } catch (e) { /* 저장 실패는 무시 */ }
+    var u = JSON.parse(localStorage.getItem(USAGE_KEY) || '{}');
+    if (u.date === todayStamp() && typeof u.chars === 'number') return u;
+  } catch (e) {}
+  return { date: todayStamp(), chars: 0 };
+}
+var usage = loadUsage();
+function addUsage(n) {
+  if (usage.date !== todayStamp()) usage = { date: todayStamp(), chars: 0 };
+  usage.chars += n;
+  try { localStorage.setItem(USAGE_KEY, JSON.stringify(usage)); } catch (e) {}
+  renderUsage();
+}
+function renderUsage() {
+  var pct = Math.min(100, Math.round(usage.chars / DAILY_CHAR_BUDGET * 100));
+  var gauge = $('usageGauge');
+  gauge.firstElementChild.style.width = pct + '%';
+  gauge.className = 'gauge' + (pct >= 80 ? ' high' : '');
+  $('usageText').textContent = usage.chars.toLocaleString() + ' 자  ('
+    + pct + '% / 기준 ' + DAILY_CHAR_BUDGET.toLocaleString() + '자)';
 }
 
-// ══════════════════════════════════════════════════════════
-//  3. 화면에 상태 문구 보여주기
-// ══════════════════════════════════════════════════════════
+/* ══════════════════════════════════════════════════════════
+   4. 상태 문구
+   ══════════════════════════════════════════════════════════ */
 var statusTimer = null;
-function setStatus(msg, kind) {
+function setStatus(msg, kind, sticky) {
   statusEl.textContent = msg || '';
   statusEl.className = kind || '';
   if (statusTimer) clearTimeout(statusTimer);
-  if (msg) {
+  if (msg && !sticky) {
     statusTimer = setTimeout(function () {
       statusEl.textContent = '';
       statusEl.className = '';
-    }, 4000);
+    }, 5000);
   }
 }
 
-// ══════════════════════════════════════════════════════════
-//  4. 결과 카드 만들기
-// ══════════════════════════════════════════════════════════
 function nowLabel() {
   var d = new Date();
   return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
 }
 
-function addCard(originalText) {
-  if (emptyMsg) { emptyMsg.remove(); emptyMsg = null; }
+/* ══════════════════════════════════════════════════════════
+   5. 클립보드 복사
+   ══════════════════════════════════════════════════════════ */
+function flashText(el, temp) {
+  var original = el.textContent;
+  el.textContent = temp;
+  el.classList.add('copied');
+  setTimeout(function () {
+    el.textContent = original;
+    el.classList.remove('copied');
+  }, 1200);
+}
+function legacyCopy(text) {
+  var ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  var ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+  document.body.removeChild(ta);
+  return ok;
+}
+async function copyText(text, flashEl) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      flashText(flashEl, '복사했습니다');
+      return;
+    }
+    if (legacyCopy(text)) flashText(flashEl, '복사했습니다');
+    else setStatus('복사에 실패했습니다. 직접 선택해서 복사해 주세요.', 'err');
+  } catch (e) {
+    setStatus('복사에 실패했습니다: ' + e.message, 'err');
+  }
+}
 
+/* ══════════════════════════════════════════════════════════
+   6. ★ 번역 API 호출 — 채팅과 자막이 함께 쓰는 단 하나의 창구 ★
+
+   1단계에서 translate() 안에 들어 있던 fetch 부분을
+   여기로 옮겨왔습니다. 브라우저는 여전히 키를 모르고,
+   같은 사이트 주소인 /api/translate 만 부릅니다.
+
+   성공하면 서버가 준 객체를 돌려주고,
+   실패하면 예외를 던집니다. 부르는 쪽에서 try-catch 로 받습니다.
+   ══════════════════════════════════════════════════════════ */
+async function callTranslateApi(text, source, target) {
+  var res = await fetch('/api/translate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: text, source: source, target: target })
+  });
+
+  var data;
+  try {
+    data = await res.json();
+  } catch (parseErr) {
+    throw new Error('서버 응답을 읽지 못했습니다 (HTTP ' + res.status + ').');
+  }
+
+  if (!res.ok || data.error) {
+    throw new Error(data.error || ('서버 오류 HTTP ' + res.status));
+  }
+
+  addUsage(text.length);  // 보낸 글자 수를 세어 둡니다
+  return data;
+}
+
+/* ══════════════════════════════════════════════════════════
+   7. 채팅 모드
+   ══════════════════════════════════════════════════════════ */
+var lastDetected = null;   // ⇄ 버튼이 참고하는 최근 감지 언어
+var chatBusy = false;
+
+function addChatCard(originalText) {
+  if (chatEmpty) { chatEmpty.remove(); chatEmpty = null; }
   var card = document.createElement('div');
   card.className = 'item pending';
 
@@ -302,157 +602,461 @@ function addCard(originalText) {
   var meta = document.createElement('div');
   meta.className = 'meta';
 
-  card.appendChild(orig);
-  card.appendChild(trans);
-  card.appendChild(meta);
-
-  // 최신 결과가 위로 오게 맨 앞에 넣습니다.
-  listEl.insertBefore(card, listEl.firstChild);
-  listEl.scrollTop = 0;
-
+  card.appendChild(orig); card.appendChild(trans); card.appendChild(meta);
+  chatListEl.insertBefore(card, chatListEl.firstChild);
   return { card: card, trans: trans, meta: meta };
 }
 
-function fillSuccess(refs, data) {
-  refs.card.className = 'item';
-  refs.trans.textContent = data.translated;
-
-  var bits = [nowLabel(), '엔진: ' + data.engine];
-  if (data.detectedSource) bits.push('감지: ' + langName(data.detectedSource));
-  bits.push('→ ' + langName(data.target));
-  if (data.fallbackFrom) bits.push('(' + data.fallbackFrom + ' 실패로 대체)');
-  refs.meta.textContent = bits.join(' · ');
-
-  // 카드를 누르면 번역문을 복사
-  refs.card.addEventListener('click', function () {
-    copyText(data.translated, refs.meta);
-  });
-}
-
-function fillError(refs, message) {
-  refs.card.className = 'item error';
-  refs.trans.textContent = '번역 실패: ' + message;
-  refs.meta.textContent = nowLabel() + ' · 입력은 그대로 두었으니 다시 시도해 보세요.';
-}
-
-// ══════════════════════════════════════════════════════════
-//  5. 클립보드 복사
-//     navigator.clipboard 는 https 또는 localhost 에서만 동작합니다.
-//     안 되는 환경을 위해 옛날 방식도 준비해 둡니다.
-// ══════════════════════════════════════════════════════════
-function flashCopied(metaEl) {
-  var original = metaEl.textContent;
-  metaEl.textContent = '복사했습니다';
-  metaEl.classList.add('copied');
-  setTimeout(function () {
-    metaEl.textContent = original;
-    metaEl.classList.remove('copied');
-  }, 1200);
-}
-
-function legacyCopy(text) {
-  var ta = document.createElement('textarea');
-  ta.value = text;
-  ta.style.position = 'fixed';
-  ta.style.opacity = '0';
-  document.body.appendChild(ta);
-  ta.select();
-  var ok = false;
-  try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
-  document.body.removeChild(ta);
-  return ok;
-}
-
-async function copyText(text, metaEl) {
-  try {
-    if (navigator.clipboard && window.isSecureContext) {
-      await navigator.clipboard.writeText(text);
-      flashCopied(metaEl);
-      return;
-    }
-    if (legacyCopy(text)) flashCopied(metaEl);
-    else setStatus('복사에 실패했습니다. 직접 선택해서 복사해 주세요.', 'err');
-  } catch (e) {
-    setStatus('복사에 실패했습니다: ' + e.message, 'err');
-  }
-}
-
-// ══════════════════════════════════════════════════════════
-//  6. 번역 요청
-//     키는 서버(Pages Function)가 갖고 있으므로
-//     브라우저는 우리 사이트 안의 /api/translate 만 부릅니다.
-// ══════════════════════════════════════════════════════════
-var busy = false;
-
-async function translate() {
-  if (busy) return;
+async function runChatTranslation() {
+  if (chatBusy) return;
 
   var text = inputEl.value.trim();
   if (!text) { setStatus('번역할 내용을 입력해 주세요.', 'err'); return; }
 
-  var source = sourceSel.value;
-  var target = targetSel.value;
+  var source = sourceSel.value, target = targetSel.value;
   if (source === target) { setStatus('원어와 목표어가 같습니다.', 'err'); return; }
 
-  busy = true;
+  chatBusy = true;
   sendBtn.disabled = true;
   sendBtn.textContent = '…';
 
-  var refs = addCard(text);
+  var refs = addChatCard(text);
   inputEl.value = '';
   autoGrow();
 
   try {
-    var res = await fetch('/api/translate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: text, source: source, target: target })
-    });
-
-    var data;
-    try {
-      data = await res.json();
-    } catch (parseErr) {
-      throw new Error('서버 응답을 읽지 못했습니다 (HTTP ' + res.status + ').');
-    }
-
-    if (!res.ok || data.error) {
-      throw new Error(data.error || ('서버 오류 HTTP ' + res.status));
-    }
-
+    var data = await callTranslateApi(text, source, target);   // ← 공용 창구 사용
     lastDetected = data.detectedSource || null;
-    fillSuccess(refs, data);
+
+    refs.card.className = 'item';
+    refs.trans.textContent = data.translated;
+
+    var bits = [nowLabel(), '엔진: ' + data.engine];
+    if (data.detectedSource) bits.push('감지: ' + langName(data.detectedSource));
+    bits.push('→ ' + langName(data.target));
+    if (data.fallbackFrom) bits.push('(' + data.fallbackFrom + ' 실패로 대체)');
+    refs.meta.textContent = bits.join(' · ');
+
+    refs.card.addEventListener('click', function () {
+      copyText(data.translated, refs.meta);
+    });
   } catch (err) {
-    // 여기서 잡아주기 때문에 실패해도 화면은 계속 동작합니다.
-    fillError(refs, (err && err.message) ? err.message : '알 수 없는 오류');
-    inputEl.value = text; // 다시 시도할 수 있게 입력을 되돌려 줍니다.
+    refs.card.className = 'item error';
+    refs.trans.textContent = '번역 실패: ' + (err && err.message ? err.message : '알 수 없는 오류');
+    refs.meta.textContent = nowLabel() + ' · 입력은 그대로 두었으니 다시 시도해 보세요.';
+    inputEl.value = text;
     autoGrow();
   } finally {
-    busy = false;
+    chatBusy = false;
     sendBtn.disabled = false;
     sendBtn.textContent = '번역';
     inputEl.focus();
   }
 }
 
-// ══════════════════════════════════════════════════════════
-//  7. 입력창 높이 자동 조절
-// ══════════════════════════════════════════════════════════
 function autoGrow() {
   inputEl.style.height = 'auto';
   inputEl.style.height = Math.min(inputEl.scrollHeight, 140) + 'px';
 }
 
-// ══════════════════════════════════════════════════════════
-//  8. 이벤트 연결
-// ══════════════════════════════════════════════════════════
-function swapLangs() {
-  var s = sourceSel.value;
-  var t = targetSel.value;
+/* ══════════════════════════════════════════════════════════
+   8. 말하기 모드 — 음성 인식
+   ══════════════════════════════════════════════════════════ */
 
+// 크롬 계열은 webkit 접두사가 붙은 이름을 씁니다.
+var SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+var recognition   = null;
+var listening     = false;   // 지금 인식이 돌고 있는가
+var isStoppedByUser = true;  // ★ 정지 버튼으로 멈춘 것인가 (자동 재시작 판단 기준)
+var restartFails  = 0;       // 연속 재시작 실패 횟수
+var networkFails  = 0;       // 연속 네트워크 오류 횟수
+var restartTimer  = null;
+var nextRestartDelay = RESTART_DELAY_MS;
+
+// 번역 호출 제어용
+var finalBuffer      = '';    // 아직 번역을 안 보낸 확정 문장들
+var activeLine       = null;  // 지금 글자가 쌓이는 중인 자막 줄
+var translateTimer   = null;  // 디바운스 타이머
+var lastTranslatedText = '';  // 직전에 번역한 문장 (같으면 건너뜀)
+
+/* ── 자막 한 줄 만들기 ── */
+function createCaptionLine() {
+  if (speakEmpty) { speakEmpty.remove(); speakEmpty = null; }
+
+  var wrap = document.createElement('div');
+  wrap.className = 'caption';
+
+  var src = document.createElement('div');
+  src.className = 'src';
+
+  var dst = document.createElement('div');
+  dst.className = 'dst waiting';
+  dst.textContent = prefs.autoTranslate ? '번역 대기 중…' : '';
+
+  var when = document.createElement('div');
+  when.className = 'when';
+  when.textContent = nowLabel();
+
+  wrap.appendChild(src); wrap.appendChild(dst); wrap.appendChild(when);
+  captionsEl.appendChild(wrap);
+  scrollToBottom();
+
+  return { wrap: wrap, src: src, dst: dst, when: when };
+}
+
+function scrollToBottom() {
+  var main = document.querySelector('main');
+  main.scrollTop = main.scrollHeight;
+}
+
+/* ── 확정된 문장이 들어왔을 때 ── */
+function handleFinalText(text) {
+  var clean = text.trim();
+  if (!clean) return;
+
+  if (!activeLine) activeLine = createCaptionLine();
+
+  finalBuffer = finalBuffer ? (finalBuffer + ' ' + clean) : clean;
+  activeLine.src.textContent = finalBuffer;
+  scrollToBottom();
+
+  // ★ 디바운스: 말이 멎고 0.5초가 지나야 한 번 번역합니다.
+  //   말이 이어지면 타이머를 계속 취소하고 다시 잡으므로
+  //   문장이 여러 조각으로 끊겨도 API 호출은 한 번입니다.
+  clearTimeout(translateTimer);
+  translateTimer = setTimeout(flushTranslation, TRANSLATE_DEBOUNCE_MS);
+}
+
+/* ── 모아둔 문장을 실제로 번역 ── */
+async function flushTranslation() {
+  clearTimeout(translateTimer);
+
+  var text = finalBuffer.trim();
+  var line = activeLine;
+
+  // 다음 발화는 새 줄에 쌓입니다
+  finalBuffer = '';
+  activeLine = null;
+
+  if (!line || !text) return;
+
+  // 자동 번역을 꺼둔 경우 — 원문만 남깁니다
+  if (!prefs.autoTranslate) {
+    line.dst.remove();
+    return;
+  }
+
+  // 공백 뺀 글자 수가 너무 적으면 건너뜁니다
+  var compact = text.replace(/\s/g, '');
+  if (compact.length < MIN_CHARS_TO_TRANSLATE) {
+    line.dst.className = 'dst waiting';
+    line.dst.textContent = '(너무 짧아 번역하지 않음)';
+    return;
+  }
+
+  // 직전에 번역한 문장과 같으면 건너뜁니다
+  if (text === lastTranslatedText) {
+    line.dst.className = 'dst waiting';
+    line.dst.textContent = '(직전과 같은 문장 — 번역 생략)';
+    return;
+  }
+
+  var source = sourceSel.value;
+  var target = targetSel.value;
+  if (source === target) {
+    line.dst.className = 'dst waiting';
+    line.dst.textContent = '(원어와 목표어가 같아 번역하지 않음)';
+    return;
+  }
+
+  lastTranslatedText = text;
+  line.dst.className = 'dst waiting';
+  line.dst.textContent = '번역 중…';
+
+  try {
+    var data = await callTranslateApi(text, source, target);   // ← 공용 창구 사용
+    line.dst.className = 'dst';
+    line.dst.textContent = data.translated;
+    line.when.textContent = nowLabel() + ' · ' + data.engine;
+    line.dst.addEventListener('click', function () {
+      copyText(data.translated, line.when);
+    });
+  } catch (err) {
+    // ★ 번역이 실패해도 원문 자막(line.src)은 그대로 남습니다.
+    //   할당량 초과(403)나 네트워크 오류가 나도 자막은 계속 나옵니다.
+    line.dst.className = 'dst failed';
+    line.dst.textContent = '번역 실패: ' + (err && err.message ? err.message : '알 수 없는 오류');
+  }
+  scrollToBottom();
+}
+
+/* ── 인식기 만들기 ── */
+function buildRecognition() {
+  var rec = new SpeechRecognitionClass();
+  rec.continuous     = true;   // 한 문장 끝나도 계속 듣기
+  rec.interimResults = true;   // 확정 전 중간 결과도 받기
+  rec.maxAlternatives = 1;     // 후보를 하나만 받기
+  rec.lang = speechTag(sourceSel.value) || 'ko-KR';
+
+  rec.onstart = function () {
+    listening = true;
+    restartFails = 0;      // start() 가 통했으니 재시작 실패 횟수만 초기화
+    updateSpeakUI();
+  };
+
+  rec.onresult = function (event) {
+    // 인식 결과가 실제로 왔다 = 네트워크가 살아 있다는 뜻.
+    // 여기서만 네트워크 실패 횟수를 되돌립니다.
+    // (onstart 에서 되돌리면 재시작할 때마다 0이 되어 3회를 절대 못 셉니다)
+    networkFails = 0;
+
+    var interim = '';
+    // resultIndex 부터 보는 이유: 이미 처리한 앞부분을 다시 읽지 않기 위해서입니다.
+    for (var i = event.resultIndex; i < event.results.length; i++) {
+      var r = event.results[i];
+      if (r.isFinal) {
+        handleFinalText(r[0].transcript);   // ★ 확정된 것만 번역 대상
+      } else {
+        interim += r[0].transcript;
+      }
+    }
+    interimEl.textContent = prefs.showInterim ? interim : '';
+    if (interim) scrollToBottom();
+  };
+
+  rec.onerror = function (event) {
+    var kind = event.error;
+
+    if (kind === 'aborted') {
+      return;  // 우리가 stop() 을 불렀을 때 등 — 무시
+    }
+
+    if (kind === 'not-allowed' || kind === 'service-not-allowed') {
+      // 먼저 확실히 멈춘 뒤에 모드를 바꾸고,
+      // 안내 문구는 맨 마지막에 띄웁니다.
+      // (순서가 바뀌면 switchMode 가 이 안내를 덮어써 버립니다)
+      isStoppedByUser = true;
+      listening = false;
+      clearTimeout(restartTimer);
+      try { recognition.abort(); } catch (e) {}
+      updateSpeakUI();
+      switchMode('chat');
+      setStatus('마이크 사용이 거부되었습니다. 주소창 왼쪽 자물쇠(또는 카메라) 아이콘에서 마이크를 허용한 뒤 말하기 탭에서 다시 시작해 주세요.', 'err', true);
+      return;
+    }
+
+    if (kind === 'no-speech') {
+      return;  // 조용히 재시작 (onend 가 알아서 처리)
+    }
+
+    if (kind === 'network') {
+      networkFails++;
+      if (networkFails >= MAX_NETWORK_FAILS) {
+        haltListening('네트워크 문제로 음성 인식을 ' + MAX_NETWORK_FAILS + '번 이어가지 못했습니다. 연결을 확인한 뒤 시작을 다시 눌러 주세요.');
+      } else {
+        nextRestartDelay = NETWORK_RETRY_MS;
+        setStatus('네트워크가 불안정합니다. 3초 뒤 다시 시도합니다… (' + networkFails + '/' + MAX_NETWORK_FAILS + ')', 'err');
+      }
+      return;
+    }
+
+    setStatus('음성 인식 오류: ' + kind, 'err');
+  };
+
+  rec.onend = function () {
+    listening = false;
+    updateSpeakUI();
+
+    // ★ 자동 재시작의 핵심
+    //   크롬은 몇 초간 소리가 없으면 continuous 여도 스스로 끝냅니다.
+    //   사용자가 정지를 누른 게 아니라면 다시 켭니다.
+    if (isStoppedByUser) {
+      flushTranslation();   // 남은 문장을 마저 번역
+      return;
+    }
+    scheduleRestart(nextRestartDelay);
+    nextRestartDelay = RESTART_DELAY_MS;
+  };
+
+  return rec;
+}
+
+function scheduleRestart(delay) {
+  if (isStoppedByUser) return;
+  clearTimeout(restartTimer);
+  restartTimer = setTimeout(function () {
+    if (isStoppedByUser) return;
+    try {
+      recognition.start();
+    } catch (e) {
+      // 이미 돌고 있는 상태에서 start() 를 부르면 예외가 납니다.
+      restartFails++;
+      if (restartFails > MAX_RESTART_FAILS) {
+        haltListening('음성 인식을 다시 시작하지 못했습니다. 시작 버튼을 눌러 주세요.');
+      } else {
+        scheduleRestart(RESTART_DELAY_MS);
+      }
+    }
+  }, delay);
+}
+
+function haltListening(message) {
+  isStoppedByUser = true;
+  listening = false;
+  clearTimeout(restartTimer);
+  try { if (recognition) recognition.abort(); } catch (e) {}
+  flushTranslation();
+  updateSpeakUI();
+  if (message) setStatus(message, 'err', true);
+}
+
+/* ── 시작 / 정지 / 지우기 ── */
+function startListening() {
+  if (!SpeechRecognitionClass) {
+    setStatus('이 브라우저는 음성 인식을 지원하지 않습니다. 크롬이나 엣지에서 열어 주세요.', 'err', true);
+    return;
+  }
+  if (sourceSel.value === 'auto') {
+    setStatus('말하기 모드에서는 원어를 직접 골라야 합니다. 자동 감지는 쓸 수 없습니다.', 'err', true);
+    return;
+  }
+  if (listening) return;
+
+  restartFails = 0;
+  networkFails = 0;
+  nextRestartDelay = RESTART_DELAY_MS;
+  isStoppedByUser = false;      // ★ 이제부터 끊기면 자동 재시작
+
+  recognition = buildRecognition();
+  try {
+    recognition.start();
+    setStatus('듣고 있습니다. 말해 보세요.', 'ok');
+  } catch (e) {
+    isStoppedByUser = true;
+    setStatus('음성 인식을 시작하지 못했습니다: ' + e.message, 'err', true);
+    updateSpeakUI();
+  }
+}
+
+function stopListening(quiet) {
+  isStoppedByUser = true;      // ★ 이 값 때문에 onend 가 재시작하지 않습니다
+  clearTimeout(restartTimer);
+  try { if (recognition) recognition.stop(); } catch (e) {}
+  interimEl.textContent = '';
+  flushTranslation();          // 남은 문장 마저 번역
+  updateSpeakUI();
+  if (!quiet) setStatus('자막을 멈췄습니다.', '');
+}
+
+function clearCaptions() {
+  captionsEl.innerHTML = '';
+  interimEl.textContent = '';
+  clearTimeout(translateTimer);
+  finalBuffer = '';
+  activeLine = null;
+  lastTranslatedText = '';
+  if (!speakEmpty) {
+    speakEmpty = document.createElement('p');
+    speakEmpty.className = 'empty';
+    speakEmpty.id = 'speakEmpty';
+    speakEmpty.innerHTML = '원어를 고르고 <b>시작</b>을 누른 뒤 말해 보세요.';
+    $('view-speak').insertBefore(speakEmpty, captionsEl);
+  }
+  setStatus('자막을 지웠습니다.', '');
+}
+
+function updateSpeakUI() {
+  startBtn.disabled = listening;
+  stopBtn.disabled  = !listening;
+  startBtn.innerHTML = listening
+    ? '<span class="dot blink"></span>듣는 중'
+    : '시작';
+}
+
+/* ══════════════════════════════════════════════════════════
+   9. 모드 전환
+   ══════════════════════════════════════════════════════════ */
+var currentMode = 'speak';
+
+function switchMode(mode) {
+  // 말하기 모드를 떠날 때는 마이크를 끕니다 (몰래 켜져 있으면 안 되니까요)
+  if (currentMode === 'speak' && mode !== 'speak' && listening) {
+    stopListening(true);
+    setStatus('다른 모드로 넘어가면서 마이크를 껐습니다.', '');
+  }
+  currentMode = mode;
+
+  document.querySelectorAll('.tab').forEach(function (t) {
+    t.classList.toggle('active', t.getAttribute('data-mode') === mode);
+  });
+  ['speak', 'chat', 'settings'].forEach(function (m) {
+    $('view-' + m).classList.toggle('active', m === mode);
+  });
+
+  $('speakBar').classList.toggle('active', mode === 'speak');
+  $('chatBar').classList.toggle('active', mode === 'chat');
+  langbar.classList.toggle('hidden', mode === 'settings');
+
+  if (mode === 'speak') {
+    hintEl.textContent = '마이크는 시작을 누른 동안에만 켜집니다.';
+  } else if (mode === 'chat') {
+    hintEl.textContent = 'Enter = 번역 · Shift+Enter = 줄바꿈';
+    inputEl.focus();
+  } else {
+    hintEl.textContent = '';
+    renderUsage();
+  }
+}
+
+/* ══════════════════════════════════════════════════════════
+   10. 설정 화면 버튼들
+   ══════════════════════════════════════════════════════════ */
+function paintChips() {
+  document.querySelectorAll('#themeCtl .chip').forEach(function (c) {
+    c.classList.toggle('on', c.getAttribute('data-theme') === prefs.theme);
+  });
+  document.querySelectorAll('#sizeCtl .chip').forEach(function (c) {
+    c.classList.toggle('on', c.getAttribute('data-size') === prefs.capsize);
+  });
+  document.querySelectorAll('#interimCtl .chip').forEach(function (c) {
+    c.classList.toggle('on', (c.getAttribute('data-interim') === 'on') === prefs.showInterim);
+  });
+  document.querySelectorAll('#autoTrCtl .chip').forEach(function (c) {
+    c.classList.toggle('on', (c.getAttribute('data-autotr') === 'on') === prefs.autoTranslate);
+  });
+}
+
+function applyPrefs() {
+  document.body.classList.toggle('light', prefs.theme === 'light');
+  document.body.setAttribute('data-capsize', prefs.capsize);
+  if (!prefs.showInterim) interimEl.textContent = '';
+  paintChips();
+}
+
+/* ══════════════════════════════════════════════════════════
+   11. 언어 드롭다운
+   ══════════════════════════════════════════════════════════ */
+function buildOptions() {
+  var autoOpt = document.createElement('option');
+  autoOpt.value = 'auto';
+  autoOpt.textContent = '자동 감지 (채팅 전용)';
+  sourceSel.appendChild(autoOpt);
+
+  LANGS.forEach(function (lang) {
+    var a = document.createElement('option');
+    a.value = lang.code; a.textContent = lang.name;
+    sourceSel.appendChild(a);
+
+    var b = document.createElement('option');
+    b.value = lang.code; b.textContent = lang.name;
+    targetSel.appendChild(b);
+  });
+}
+
+function swapLangs() {
+  var s = sourceSel.value, t = targetSel.value;
   if (s === 'auto') {
-    // 자동 감지 상태에서는 바꿀 '원어'가 정해져 있지 않습니다.
-    // 직전에 감지된 언어가 있으면 그것을 사용합니다.
     if (!lastDetected) {
       setStatus('자동 감지 상태입니다. 한 번 번역한 뒤에 바꾸거나, 원어를 직접 골라 주세요.', 'err');
       return;
@@ -463,42 +1067,113 @@ function swapLangs() {
     sourceSel.value = t;
     targetSel.value = s;
   }
-  savePref();
+  onLangChanged();
   setStatus(langName(sourceSel.value) + ' → ' + langName(targetSel.value), 'ok');
 }
 
-sendBtn.addEventListener('click', translate);
+function onLangChanged() {
+  prefs.source = sourceSel.value;
+  prefs.target = targetSel.value;
+  savePrefs();
+
+  // 듣는 중에 원어를 바꾸면, 인식기를 새 언어로 다시 켭니다.
+  if (listening) {
+    setStatus('원어가 바뀌어 음성 인식을 다시 시작합니다.', '');
+    isStoppedByUser = true;
+    try { recognition.stop(); } catch (e) {}
+    setTimeout(function () { startListening(); }, 400);
+  }
+}
+
+/* ══════════════════════════════════════════════════════════
+   12. 이벤트 연결
+   ══════════════════════════════════════════════════════════ */
+document.querySelectorAll('.tab').forEach(function (t) {
+  t.addEventListener('click', function () { switchMode(t.getAttribute('data-mode')); });
+});
+
+startBtn.addEventListener('click', startListening);
+stopBtn.addEventListener('click', function () { stopListening(false); });
+clearBtn.addEventListener('click', clearCaptions);
+
+sendBtn.addEventListener('click', runChatTranslation);
 swapBtn.addEventListener('click', swapLangs);
-sourceSel.addEventListener('change', savePref);
-targetSel.addEventListener('change', savePref);
+sourceSel.addEventListener('change', onLangChanged);
+targetSel.addEventListener('change', onLangChanged);
 
 inputEl.addEventListener('input', autoGrow);
-
-// Enter 로 번역. Shift+Enter 는 줄바꿈.
-// 한글 조합 중(isComposing)에는 무시해야 글자가 잘리지 않습니다.
 inputEl.addEventListener('keydown', function (e) {
+  // 한글 조합 중(isComposing)에는 무시해야 글자가 잘리지 않습니다.
   if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
     e.preventDefault();
-    translate();
+    runChatTranslation();
   }
 });
 
-// ══════════════════════════════════════════════════════════
-//  9. 시작
-// ══════════════════════════════════════════════════════════
+document.querySelectorAll('#themeCtl .chip').forEach(function (c) {
+  c.addEventListener('click', function () {
+    prefs.theme = c.getAttribute('data-theme'); savePrefs(); applyPrefs();
+  });
+});
+document.querySelectorAll('#sizeCtl .chip').forEach(function (c) {
+  c.addEventListener('click', function () {
+    prefs.capsize = c.getAttribute('data-size'); savePrefs(); applyPrefs();
+  });
+});
+document.querySelectorAll('#interimCtl .chip').forEach(function (c) {
+  c.addEventListener('click', function () {
+    prefs.showInterim = c.getAttribute('data-interim') === 'on'; savePrefs(); applyPrefs();
+  });
+});
+document.querySelectorAll('#autoTrCtl .chip').forEach(function (c) {
+  c.addEventListener('click', function () {
+    prefs.autoTranslate = c.getAttribute('data-autotr') === 'on'; savePrefs(); applyPrefs();
+  });
+});
+
+$('resetUsage').addEventListener('click', function () {
+  usage = { date: todayStamp(), chars: 0 };
+  try { localStorage.setItem(USAGE_KEY, JSON.stringify(usage)); } catch (e) {}
+  renderUsage();
+  setStatus('사용량 숫자를 초기화했습니다.', 'ok');
+});
+
+$('resetPrefs').addEventListener('click', function () {
+  try {
+    localStorage.removeItem(PREF_KEY);
+    localStorage.removeItem(USAGE_KEY);
+  } catch (e) {}
+  setStatus('저장된 설정을 지웠습니다. 새로고침하면 처음 상태가 됩니다.', 'ok', true);
+});
+
+// 탭을 닫거나 다른 페이지로 갈 때 마이크를 확실히 끕니다.
+window.addEventListener('pagehide', function () {
+  isStoppedByUser = true;
+  try { if (recognition) recognition.abort(); } catch (e) {}
+});
+
+/* ══════════════════════════════════════════════════════════
+   13. 시작
+   ══════════════════════════════════════════════════════════ */
 (function init() {
   buildOptions();
+  loadPrefs();
 
-  var pref = loadPref();
-  sourceSel.value = (pref && pref.source) || 'auto';
-  targetSel.value = (pref && pref.target) || 'ko';
+  sourceSel.value = prefs.source || 'ko';
+  targetSel.value = prefs.target || 'en';
+  if (!sourceSel.value) sourceSel.value = 'ko';
+  if (!targetSel.value) targetSel.value = 'en';
 
-  // 저장된 값이 목록에 없으면 기본값으로 되돌립니다.
-  if (!sourceSel.value) sourceSel.value = 'auto';
-  if (!targetSel.value) targetSel.value = 'ko';
-
+  applyPrefs();
+  renderUsage();
+  updateSpeakUI();
   autoGrow();
-  inputEl.focus();
+  switchMode('speak');
+
+  if (!SpeechRecognitionClass) {
+    setStatus('이 브라우저는 음성 인식을 지원하지 않습니다. 말하기 모드는 크롬 또는 엣지에서 써 주세요. 채팅 모드는 그대로 쓸 수 있습니다.', 'err', true);
+    startBtn.disabled = true;
+  }
 })();
 </script>
 </body>
