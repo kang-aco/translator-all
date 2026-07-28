@@ -253,6 +253,46 @@
   #status.err { color: var(--fail); }
   #status.ok { color: var(--ok); }
 
+  /* ══ 2.5단계: 자막 표시 방식 ══════════════════════════════
+     ※ 애니메이션은 일부러 넣지 않습니다. 읽는 데 방해됩니다. */
+
+  /* 자막을 영역 아래쪽에 붙입니다.
+     그러면 새 자막이 아래에 생기면서 기존 자막이 위로 밀려 올라가고,
+     "지금 읽는 줄"의 위치가 항상 같은 자리에 머뭅니다. */
+  #view-speak.active {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    min-height: 100%;
+  }
+  #captions { flex: 0 0 auto; }
+
+  /* ★ 번역이 늦게 도착해도 화면이 튀지 않도록 자리를 미리 잡아둡니다.
+     원문이 확정되는 순간 번역 한 줄 높이가 확보되고,
+     번역이 오면 그 자리를 채웁니다. */
+  .caption .dst { min-height: 1.45em; }
+
+  /* 번역 기다리는 중 — 흐린 점 세 개 */
+  .caption .dst.pending {
+    color: var(--interim);
+    letter-spacing: .18em;
+  }
+
+  /* 표시 내용 선택 */
+  body[data-capcontent="translation"] .caption .src { display: none; }
+  body[data-capcontent="source"]      .caption .dst { display: none; }
+
+  /* 표시 모드별 "듣는 중" 줄.
+     이 규칙은 글자 크기 규칙보다 뒤에 있어야 이깁니다. */
+  body[data-capmode="phrase"] #interim { display: none; }
+  body[data-capmode="phrase-live"] #interim {
+    font-size: 13.5px;
+    opacity: .8;
+    margin-top: 4px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--line);
+  }
+
   /* 녹음 중 표시등 */
   .dot {
     display: inline-block;
@@ -318,11 +358,46 @@
     </div>
 
     <div class="setting">
-      <h3>중간 결과 표시</h3>
-      <p>말하는 도중의 잠정 인식 결과를 흐린 글씨로 미리 보여줍니다. 번역은 하지 않습니다.</p>
-      <div class="controls" id="interimCtl">
-        <button class="chip" type="button" data-interim="on">켜기</button>
-        <button class="chip" type="button" data-interim="off">끄기</button>
+      <h3>자막 표시 방식</h3>
+      <p><b>구절</b>은 말이 끝난 덩어리째 툭툭 나타납니다. <b>흐름</b>은 단어가 하나씩 흘러갑니다.</p>
+      <div class="controls" id="capModeCtl">
+        <button class="chip" type="button" data-capmode="phrase">구절</button>
+        <button class="chip" type="button" data-capmode="phrase-live">구절 + 듣는 중</button>
+        <button class="chip" type="button" data-capmode="flow">흐름</button>
+      </div>
+    </div>
+
+    <div class="setting">
+      <h3>표시 내용</h3>
+      <p>번역만 보면 읽을 양이 절반으로 줄어 따라가기 쉽습니다.</p>
+      <div class="controls" id="capContentCtl">
+        <button class="chip" type="button" data-capcontent="translation">번역만</button>
+        <button class="chip" type="button" data-capcontent="both">원문 + 번역</button>
+        <button class="chip" type="button" data-capcontent="source">원문만</button>
+      </div>
+      <p style="margin:10px 0 0">원문만 볼 때 번역 할당량까지 아끼려면 아래 <b>자동 번역</b>도 끄세요.</p>
+    </div>
+
+    <div class="setting">
+      <h3>표시 줄 수</h3>
+      <p>화면에 남겨둘 자막 개수입니다. 새 자막이 오면 위로 밀려 올라갑니다.</p>
+      <div class="controls" id="capLinesCtl">
+        <button class="chip" type="button" data-caplines="1">1줄</button>
+        <button class="chip" type="button" data-caplines="2">2줄</button>
+        <button class="chip" type="button" data-caplines="3">3줄</button>
+        <button class="chip" type="button" data-caplines="4">4줄</button>
+      </div>
+    </div>
+
+    <div class="setting">
+      <h3>최소 표시 시간</h3>
+      <p>짧은 구절이 순식간에 사라지지 않도록, 이 시간이 지나기 전에는 지우지 않습니다.</p>
+      <div class="controls" id="minHoldCtl">
+        <button class="chip" type="button" data-minhold="1000">1초</button>
+        <button class="chip" type="button" data-minhold="2000">2초</button>
+        <button class="chip" type="button" data-minhold="3000">3초</button>
+        <button class="chip" type="button" data-minhold="4000">4초</button>
+        <button class="chip" type="button" data-minhold="5000">5초</button>
       </div>
     </div>
 
@@ -450,8 +525,19 @@ var prefs = {
   target: 'en',
   theme: 'dark',
   capsize: 'm',
-  showInterim: true,
-  autoTranslate: true
+  autoTranslate: true,
+
+  /* ── 자막 표시 방식 (2.5단계에서 추가) ────────────────────
+     capMode    : 'flow'        지금 방식. 중간 결과가 실시간으로 흘러감
+                  'phrase'      확정된 구절만 표시 (기본값)
+                  'phrase-live' 확정 구절 + 듣는 중인 한 줄을 따로 표시
+     capContent : 'both' 원문+번역 / 'translation' 번역만(기본) / 'source' 원문만
+     capLines   : 화면에 유지할 자막 개수 (1~4)
+     minHoldMs  : 자막 하나가 최소한 화면에 머무는 시간 (1000~5000) */
+  capMode: 'phrase',
+  capContent: 'translation',
+  capLines: 2,
+  minHoldMs: 2000
 };
 
 function loadPrefs() {
@@ -755,13 +841,15 @@ function createCaptionLine() {
 
   var wrap = document.createElement('div');
   wrap.className = 'caption';
+  wrap.dataset.born = String(Date.now());   // 언제 생겼는지 (최소 표시 시간 계산용)
 
   var src = document.createElement('div');
   src.className = 'src';
 
   var dst = document.createElement('div');
-  dst.className = 'dst waiting';
-  dst.textContent = prefs.autoTranslate ? '번역 대기 중…' : '';
+  // ★ 번역이 도착하기 전까지 자리를 지키는 흐린 점 세 개
+  dst.className = 'dst pending';
+  dst.textContent = prefs.autoTranslate ? '···' : '';
 
   var when = document.createElement('div');
   when.className = 'when';
@@ -769,9 +857,33 @@ function createCaptionLine() {
 
   wrap.appendChild(src); wrap.appendChild(dst); wrap.appendChild(when);
   captionsEl.appendChild(wrap);
+  trimCaptions();
   scrollToBottom();
 
   return { wrap: wrap, src: src, dst: dst, when: when };
+}
+
+/* ── 줄 수 유지 + 최소 표시 시간 ──────────────────────────
+   정해진 개수를 넘으면 맨 위(가장 오래된) 자막을 지웁니다.
+   다만 그 자막이 아직 최소 표시 시간을 못 채웠으면 지우지 않고,
+   시간이 될 때 다시 시도합니다. 그동안은 잠깐 한 줄 더 보입니다. */
+var trimTimer = null;
+
+function trimCaptions() {
+  clearTimeout(trimTimer);
+
+  var max = prefs.capLines;
+  while (captionsEl.children.length > max) {
+    var oldest = captionsEl.children[0];
+    var age = Date.now() - Number(oldest.dataset.born || 0);
+
+    if (age < prefs.minHoldMs) {
+      // 아직 이릅니다. 남은 시간만큼 기다렸다가 다시 확인합니다.
+      trimTimer = setTimeout(trimCaptions, prefs.minHoldMs - age);
+      return;
+    }
+    oldest.remove();
+  }
 }
 
 function scrollToBottom() {
@@ -840,8 +952,9 @@ async function flushTranslation() {
   }
 
   lastTranslatedText = text;
-  line.dst.className = 'dst waiting';
-  line.dst.textContent = '번역 중…';
+  // ★ 자리는 이미 잡혀 있습니다. 점 세 개를 그대로 두어 화면이 튀지 않게 합니다.
+  line.dst.className = 'dst pending';
+  line.dst.textContent = '···';
 
   try {
     var data = await callTranslateApi(text, source, target);   // ← 공용 창구 사용
@@ -901,7 +1014,9 @@ function buildRecognition() {
         interim += r[0].transcript;
       }
     }
-    interimEl.textContent = prefs.showInterim ? interim : '';
+    // 표시 방식에 따라 "듣는 중" 줄을 채울지 결정합니다.
+    // (구절 모드에서는 중간 결과를 화면에 띄우지 않습니다)
+    interimEl.textContent = showsInterim() ? interim : '';
     if (interim) scrollToBottom();
   };
 
@@ -1200,6 +1315,7 @@ function clearCaptions() {
   captionsEl.innerHTML = '';
   interimEl.textContent = '';
   clearTimeout(translateTimer);
+  clearTimeout(trimTimer);
   finalBuffer = '';
   activeLine = null;
   lastTranslatedText = '';
@@ -1266,18 +1382,37 @@ function paintChips() {
   document.querySelectorAll('#sizeCtl .chip').forEach(function (c) {
     c.classList.toggle('on', c.getAttribute('data-size') === prefs.capsize);
   });
-  document.querySelectorAll('#interimCtl .chip').forEach(function (c) {
-    c.classList.toggle('on', (c.getAttribute('data-interim') === 'on') === prefs.showInterim);
-  });
   document.querySelectorAll('#autoTrCtl .chip').forEach(function (c) {
     c.classList.toggle('on', (c.getAttribute('data-autotr') === 'on') === prefs.autoTranslate);
   });
+
+  // 2.5단계에서 추가된 자막 설정들
+  document.querySelectorAll('#capModeCtl .chip').forEach(function (c) {
+    c.classList.toggle('on', c.getAttribute('data-capmode') === prefs.capMode);
+  });
+  document.querySelectorAll('#capContentCtl .chip').forEach(function (c) {
+    c.classList.toggle('on', c.getAttribute('data-capcontent') === prefs.capContent);
+  });
+  document.querySelectorAll('#capLinesCtl .chip').forEach(function (c) {
+    c.classList.toggle('on', Number(c.getAttribute('data-caplines')) === prefs.capLines);
+  });
+  document.querySelectorAll('#minHoldCtl .chip').forEach(function (c) {
+    c.classList.toggle('on', Number(c.getAttribute('data-minhold')) === prefs.minHoldMs);
+  });
+}
+
+/* 지금 설정에서 "듣는 중" 줄을 보여줘야 하는가 */
+function showsInterim() {
+  return prefs.capMode === 'flow' || prefs.capMode === 'phrase-live';
 }
 
 function applyPrefs() {
   document.body.classList.toggle('light', prefs.theme === 'light');
   document.body.setAttribute('data-capsize', prefs.capsize);
-  if (!prefs.showInterim) interimEl.textContent = '';
+  document.body.setAttribute('data-capmode', prefs.capMode);
+  document.body.setAttribute('data-capcontent', prefs.capContent);
+  if (!showsInterim()) interimEl.textContent = '';
+  trimCaptions();     // 줄 수를 바꾼 경우 즉시 반영
   paintChips();
 }
 
@@ -1367,9 +1502,24 @@ document.querySelectorAll('#sizeCtl .chip').forEach(function (c) {
     prefs.capsize = c.getAttribute('data-size'); savePrefs(); applyPrefs();
   });
 });
-document.querySelectorAll('#interimCtl .chip').forEach(function (c) {
+document.querySelectorAll('#capModeCtl .chip').forEach(function (c) {
   c.addEventListener('click', function () {
-    prefs.showInterim = c.getAttribute('data-interim') === 'on'; savePrefs(); applyPrefs();
+    prefs.capMode = c.getAttribute('data-capmode'); savePrefs(); applyPrefs();
+  });
+});
+document.querySelectorAll('#capContentCtl .chip').forEach(function (c) {
+  c.addEventListener('click', function () {
+    prefs.capContent = c.getAttribute('data-capcontent'); savePrefs(); applyPrefs();
+  });
+});
+document.querySelectorAll('#capLinesCtl .chip').forEach(function (c) {
+  c.addEventListener('click', function () {
+    prefs.capLines = Number(c.getAttribute('data-caplines')); savePrefs(); applyPrefs();
+  });
+});
+document.querySelectorAll('#minHoldCtl .chip').forEach(function (c) {
+  c.addEventListener('click', function () {
+    prefs.minHoldMs = Number(c.getAttribute('data-minhold')); savePrefs(); applyPrefs();
   });
 });
 document.querySelectorAll('#autoTrCtl .chip').forEach(function (c) {
