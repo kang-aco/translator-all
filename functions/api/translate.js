@@ -12,7 +12,7 @@
  *   GOOGLE_TRANSLATE_API_KEY  — Google Cloud Translation 키
  *   GEMINI_API_KEY            — Gemini 키 (4단계에서 추가)
  *   TRANSLATE_ENGINE          — (선택) "deepl" / "google" / "gemini" 로 강제 지정
- *   LLM_MODEL                 — (선택) Gemini 모델 이름. 기본 gemini-3.6-flash
+ *   LLM_MODEL                 — (선택) Gemini 모델 이름. 기본 gemini-3.1-flash-lite-preview
  *                                모델은 단종될 수 있습니다. 아래 DEFAULT_LLM_MODEL
  *                                주석을 꼭 읽어보세요.
  */
@@ -65,8 +65,13 @@ const LLM_LANG_NAME = {
  *
  * [이력]
  * gemini-2.5-flash — 신규 사용자에게 막혀 404. 2026-07-29 교체함.
+ * gemini-3.6-flash — 더 가볍고 빠른 lite 로 옮김. 2026-07-29 교체함.
+ *
+ * ※ 지금 값은 이름에 preview 가 붙은 미리보기 모델입니다.
+ *   미리보기 모델은 정식 모델보다 빨리 없어질 수 있으니,
+ *   콘솔에 404 가 보이면 이 줄부터 의심하세요.
  */
-const DEFAULT_LLM_MODEL = 'gemini-3.6-flash';
+const DEFAULT_LLM_MODEL = 'gemini-3.1-flash-lite-preview';
 
 const MAX_CONTEXT_CHARS = 1500;   // 맥락 문장이 아무리 많아도 이만큼까지만 보냅니다
 
