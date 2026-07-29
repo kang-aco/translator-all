@@ -139,7 +139,8 @@ function buildRecognition() {
 
     // 표시 방식에 따라 "듣는 중" 줄을 채울지 결정합니다.
     // (구절 모드에서는 중간 결과를 화면에 띄우지 않습니다)
-    interimEl.textContent = showsInterim() ? interim : '';
+    // setInterimText 가 INTERIM_MAX_LINES 줄까지만 남기고 앞부분을 잘라냅니다
+    setInterimText(showsInterim() ? interim : '');
     if (interim) scrollToBottom();
   };
 

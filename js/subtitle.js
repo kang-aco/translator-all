@@ -97,6 +97,47 @@ function renderSegments(firstLine, segments, engine) {
   scrollToBottom();
 }
 
+/* ── "듣는 중" 회색 줄 채우기 — 뒤쪽만 보이게 ──────────────
+   인식 중인 문장 전체를 다 보여주면 창의 절반을 차지해 자막을 가립니다.
+   INTERIM_MAX_LINES 줄을 넘으면 앞부분을 잘라내고 최신 부분만 남깁니다.
+
+   [왜 글자 수가 아니라 높이로 재는가]
+   한 줄에 몇 글자가 들어가는지는 글자 크기와 창 너비에 따라 달라집니다.
+   설정에서 "아주 크게"를 고르거나 PiP 창 폭을 줄이면 확 바뀝니다.
+   그래서 글자 수로 자르지 않고, 실제로 그려본 높이를 재서 자릅니다.
+
+   ※ 기존 자막 로직(createCaptionLine, trimCaptions)은 건드리지 않습니다.
+     이 함수는 #interim 한 줄에만 씁니다. */
+function setInterimText(text) {
+  if (!text) { interimEl.textContent = ''; return; }
+
+  interimEl.textContent = text;
+  if (!INTERIM_MAX_LINES || INTERIM_MAX_LINES < 1) return;   // 0 이면 자르지 않음
+
+  /* 이 요소가 본 페이지에 있든 PiP 창에 있든 맞는 창에서 계산값을 읽습니다.
+     PiP 창은 다른 문서라서 window.getComputedStyle 로는 어긋날 수 있습니다. */
+  var view = interimEl.ownerDocument.defaultView || window;
+  var cs = view.getComputedStyle(interimEl);
+  var lh = parseFloat(cs.lineHeight);
+  if (!lh) lh = parseFloat(cs.fontSize) * 1.55;   // lineHeight 가 'normal' 일 때
+  var pad = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+  var maxH = lh * INTERIM_MAX_LINES + pad + 1;    // 1px 은 반올림 여유
+
+  if (interimEl.scrollHeight <= maxH) return;     // 안 넘치면 그대로 둡니다
+
+  /* 앞에서부터 몇 낱말을 버려야 들어가는지 이진 탐색으로 찾습니다.
+     한 글자씩 줄여가며 재면 너무 느려서, 절반씩 좁혀 7번 안에 끝냅니다. */
+  var words = text.split(' ');
+  var lo = 0, hi = words.length - 1, best = words.length - 1;
+  while (lo <= hi) {
+    var mid = (lo + hi) >> 1;
+    interimEl.textContent = '… ' + words.slice(mid).join(' ');
+    if (interimEl.scrollHeight <= maxH) { best = mid; hi = mid - 1; }
+    else lo = mid + 1;
+  }
+  interimEl.textContent = (best > 0 ? '… ' : '') + words.slice(best).join(' ');
+}
+
 function clearCaptions() {
   captionsEl.innerHTML = '';
   interimEl.textContent = '';
