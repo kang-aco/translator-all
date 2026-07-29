@@ -12,7 +12,9 @@
  *   GOOGLE_TRANSLATE_API_KEY  — Google Cloud Translation 키
  *   GEMINI_API_KEY            — Gemini 키 (4단계에서 추가)
  *   TRANSLATE_ENGINE          — (선택) "deepl" / "google" / "gemini" 로 강제 지정
- *   LLM_MODEL                 — (선택) Gemini 모델 이름. 기본 gemini-2.5-flash
+ *   LLM_MODEL                 — (선택) Gemini 모델 이름. 기본 gemini-3.6-flash
+ *                                모델은 단종될 수 있습니다. 아래 DEFAULT_LLM_MODEL
+ *                                주석을 꼭 읽어보세요.
  */
 
 // 화면에서 쓰는 짧은 코드 -> 각 API가 요구하는 코드로 바꾸는 표
@@ -44,7 +46,28 @@ const LLM_LANG_NAME = {
   it: '이탈리아어', id: '인도네시아어', nl: '네덜란드어', auto: '(자동 감지)',
 };
 
-const DEFAULT_LLM_MODEL = 'gemini-2.5-flash';
+/* ★ 기본 모델 이름 — 단종되면 여기도 함께 고쳐야 합니다 ★
+ *
+ * 환경변수 LLM_MODEL 로 덮어쓸 수 있지만, 그걸 안 넣으면 이 값이 쓰입니다.
+ * 즉 이 값이 낡으면 아무것도 안 하는 사용자는 그대로 고장납니다.
+ *
+ * [모델이 단종되면 어떻게 보이는가]
+ * 호출이 404 로 실패하고, 아래 대체 고리를 타고 조용히 구글 번역으로
+ * 넘어갑니다. 자막은 계속 나오므로 겉으로는 멀쩡해 보이지만
+ * 맥락 번역은 하나도 안 됩니다. 콘솔의
+ *   ⚠ gemini 실패로 대체: Gemini 오류 (HTTP 404)
+ * 가 유일한 단서입니다.
+ *
+ * [그래서 지켜야 할 것]
+ * 새 모델로 갈아탈 때는 Cloudflare 환경변수 LLM_MODEL 만 바꾸지 말고
+ * 반드시 이 기본값도 같이 고쳐 두세요. 그래야 환경변수를 안 넣은
+ * 사람이나 다른 곳에 새로 배포했을 때도 정상 동작합니다.
+ *
+ * [이력]
+ * gemini-2.5-flash — 신규 사용자에게 막혀 404. 2026-07-29 교체함.
+ */
+const DEFAULT_LLM_MODEL = 'gemini-3.6-flash';
+
 const MAX_CONTEXT_CHARS = 1500;   // 맥락 문장이 아무리 많아도 이만큼까지만 보냅니다
 
 /** JSON 응답을 만드는 잔심부름 함수 */
