@@ -190,8 +190,11 @@ var PIP_SUPPORTED = ('documentPictureInPicture' in window);
 var PIP_BG_DARK  = 'rgba(8, 10, 14, 0.94)';
 var PIP_BG_LIGHT = 'rgba(255, 255, 255, 0.94)';
 
-/* 글자 크기표 — [원문, 번역] (본 페이지 CSS 의 data-capsize 규칙과 같은 값) */
-var PIP_SIZE_PX = { s: [15, 14], m: [19, 17], l: [24, 21], xl: [31, 26] };
+/* 글자 크기표 — [원문, 번역] (본 페이지 CSS 의 data-capsize 규칙과 같은 값)
+   ★ 번역문이 원문보다 큽니다. 번역이 주인공이기 때문입니다.
+     index.html 의 body[data-capsize=...] 규칙과 짝이 맞아야 하므로
+     한쪽만 고치지 마세요. */
+var PIP_SIZE_PX = { s: [14, 15], m: [16, 19], l: [19, 24], xl: [24, 31] };
 
 var pipWin        = null;   // 열려 있는 PiP 창 (없으면 null)
 var pipBody       = null;   // 자막이 들어가는 칸
@@ -219,32 +222,37 @@ function pipColors() {
   };
 }
 
-/* ── 자막 한 줄에 인라인 스타일 바르기 ── */
+/* ── 자막 한 줄에 인라인 스타일 바르기 ──────────────────────
+   ★ PiP 창은 본 페이지의 <style> 을 물려받지 않습니다. 그래서 여기서
+     자바스크립트로 직접 발라야 합니다. index.html 의 .caption 규칙과
+     같은 모양이 되도록 짝을 맞춰 두었습니다. 한쪽만 고치면 어긋납니다.
+
+   읽기 편한 것이 먼저라서, 번역문은 크고 진하게 / 원문은 작고 흐리게 합니다. */
 function pipStyleCaption(wrap, c, size) {
-  wrap.style.cssText = 'padding:5px 0;';
+  wrap.style.cssText = 'padding:7px 0;';
 
   var src = wrap.querySelector('.src');
   var dst = wrap.querySelector('.dst');
   var when = wrap.querySelector('.when');
 
-  if (src) {
+  if (src) {                                   // 원문 — 보조
     src.style.cssText =
-      'font-weight:600;word-break:break-word;line-height:1.35;'
-      + 'color:' + c.final + ';font-size:' + size[0] + 'px;'
+      'font-weight:400;word-break:break-word;line-height:1.5;'
+      + 'color:' + c.muted + ';font-size:' + size[0] + 'px;'
       + 'display:' + (prefs.capContent === 'translation' ? 'none' : 'block') + ';';
   }
 
-  if (dst) {
+  if (dst) {                                   // 번역문 — 주인공
     // 상태(class)에 따라 색이 달라집니다 — 본 페이지 CSS 와 같은 규칙입니다.
     var cls = dst.className;
-    var color = c.accent, extra = '';
-    if (cls.indexOf('pending') >= 0)      { color = c.interim; extra = 'letter-spacing:.18em;'; }
-    else if (cls.indexOf('waiting') >= 0) { color = c.muted;   extra = 'font-style:italic;'; }
-    else if (cls.indexOf('failed') >= 0)  { color = c.fail; }
+    var color = c.final, weight = '600', extra = '';
+    if (cls.indexOf('pending') >= 0)      { color = c.interim; weight = '400'; extra = 'letter-spacing:.18em;'; }
+    else if (cls.indexOf('waiting') >= 0) { color = c.muted;   weight = '400'; extra = 'font-style:italic;'; }
+    else if (cls.indexOf('failed') >= 0)  { color = c.fail;    weight = '500'; }
 
     dst.style.cssText =
-      'margin-top:4px;word-break:break-word;line-height:1.35;min-height:1.45em;'
-      + 'color:' + color + ';font-size:' + size[1] + 'px;' + extra
+      'margin-top:6px;word-break:break-word;line-height:1.5;min-height:1.5em;'
+      + 'color:' + color + ';font-size:' + size[1] + 'px;font-weight:' + weight + ';' + extra
       + 'display:' + (prefs.capContent === 'source' ? 'none' : 'block') + ';';
   }
 
@@ -277,12 +285,12 @@ function pipRestyle() {
     interimEl.style.cssText = 'display:none;';
   } else if (prefs.capMode === 'phrase-live') {
     interimEl.style.cssText =
-      'display:block;word-break:break-word;flex:0 0 auto;'
-      + 'color:' + c.interim + ';font-size:13.5px;opacity:.8;'
-      + 'margin-top:4px;padding-top:8px;border-top:1px dashed ' + c.line + ';';
+      'display:block;word-break:break-word;flex:0 0 auto;line-height:1.5;'
+      + 'color:' + c.interim + ';font-size:13.5px;'
+      + 'margin-top:8px;padding-top:10px;border-top:1px solid ' + c.line + ';';
   } else {
     interimEl.style.cssText =
-      'display:block;word-break:break-word;flex:0 0 auto;padding:6px 0;'
+      'display:block;word-break:break-word;flex:0 0 auto;padding:8px 0;line-height:1.5;'
       + 'color:' + c.interim + ';font-size:' + size[0] + 'px;';
   }
 }
@@ -384,16 +392,18 @@ async function openPip() {
   d.documentElement.style.cssText = 'height:100%;';
   d.body.style.cssText =
     'margin:0;height:100%;display:flex;flex-direction:column;overflow:hidden;'
-    + "font-family:system-ui,'Segoe UI',Roboto,'Noto Sans KR',sans-serif;"
+    // 본 페이지와 같은 글꼴 차례입니다. 한글이 맑은 고딕으로 잘 떨어집니다.
+    + "font-family:'Segoe UI','Malgun Gothic','Apple SD Gothic Neo',"
+    + "'Noto Sans KR',system-ui,sans-serif;"
     + '-webkit-font-smoothing:antialiased;';
 
   /* 윗줄: 언어 조합 + 정지 버튼 */
   var bar = d.createElement('div');
   bar.style.cssText = 'flex:0 0 auto;display:flex;align-items:center;gap:10px;'
-    + 'padding:5px 12px;font-size:11.5px;border-bottom:1px solid ' + c.line + ';';
+    + 'padding:7px 14px;font-size:11px;border-bottom:1px solid ' + c.line + ';';
 
   pipLangEl = d.createElement('span');
-  pipLangEl.style.cssText = 'letter-spacing:.06em;font-weight:600;';
+  pipLangEl.style.cssText = 'letter-spacing:.08em;font-weight:600;';
 
   var spacer = d.createElement('span');
   spacer.style.cssText = 'flex:1 1 auto;';
@@ -401,8 +411,8 @@ async function openPip() {
   pipStopBtn = d.createElement('button');
   pipStopBtn.type = 'button';
   pipStopBtn.textContent = '정지';
-  pipStopBtn.style.cssText = 'border:1px solid ' + c.line + ';border-radius:7px;'
-    + 'padding:3px 12px;font-size:11.5px;font-weight:600;cursor:pointer;'
+  pipStopBtn.style.cssText = 'border:1px solid ' + c.line + ';border-radius:999px;'
+    + 'padding:3px 13px;font-size:11px;font-weight:600;cursor:pointer;'
     + 'background:transparent;color:' + c.fail + ';font-family:inherit;';
   pipStopBtn.addEventListener('click', function () { stopListening(); });
 
@@ -411,7 +421,7 @@ async function openPip() {
   /* 아랫칸: 자막. 아래쪽에 붙여서 위로 밀려 올라가게 합니다. */
   pipBody = d.createElement('div');
   pipBody.style.cssText = 'flex:1 1 auto;display:flex;flex-direction:column;'
-    + 'justify-content:flex-end;overflow:hidden;padding:6px 12px 10px;';
+    + 'justify-content:flex-end;overflow:hidden;padding:8px 16px 12px;';
 
   d.body.appendChild(bar);
   d.body.appendChild(pipBody);

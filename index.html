@@ -5,33 +5,50 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>실시간 통번역기</title>
 <style>
-  /* ══ 색깔 모음. body 에 light 클래스가 붙으면 밝은 테마로 바뀝니다 ══ */
+  /* ══ 색깔 모음. body 에 light 클래스가 붙으면 밝은 테마로 바뀝니다 ══
+
+     [회색 계조 — 깊이를 만드는 4단계]
+       --bg       가장 뒤 (화면 바탕)
+       --panel    카드·머리말·바닥글 (바탕보다 한 겹 앞)
+       --panel-2  그 위에 놓이는 조작 요소 (드롭다운, 칩, 보조 버튼)
+       --line     은은한 경계선   /  --line-2 는 눈에 띄어야 할 때만
+
+     [글자 3단계]
+       --final  자막 번역문 (가장 진하게)  >  --text 본문  >  --muted 설명
+       --faint  힌트처럼 더 흐려도 되는 글자                              */
   :root {
-    --bg: #0f1115;
-    --panel: #181b22;
-    --panel-2: #10131a;
-    --line: #2a2f3a;
-    --text: #e6e8ec;
-    --muted: #9aa3b2;
-    --final: #ffffff;   /* 확정된 자막 — 가장 진하게 */
-    --interim: #6f7787; /* 중간 결과 — 흐리게 */
-    --accent: #6ea8fe;
-    --ok: #3ddc97;
-    --fail: #ff6b6b;
+    --bg: #0d0f13;
+    --panel: #15181e;
+    --panel-2: #1c2028;   /* 어두운 테마에서는 위로 올라올수록 밝아집니다 */
+    --line: #262b34;
+    --line-2: #343a45;
+    --text: #e8eaef;
+    --muted: #8d95a3;
+    --faint: #626b79;
+    --final: #ffffff;   /* 자막 번역문 — 가장 진하게 */
+    --interim: #6b7381; /* 중간 결과 — 흐리게 */
+    --accent: #7aa9f7;
+    --ok: #4ad295;
+    --fail: #f0736f;
   }
   body.light {
-    --bg: #f4f5f7;
+    --bg: #f4f5f8;
     --panel: #ffffff;
-    --panel-2: #f0f1f4;
-    --line: #d7dae1;
-    --text: #1c1f26;
-    --muted: #6b7280;
-    --final: #000000;   /* 밝은 테마에서는 진한 검정 */
-    --interim: #a2a8b4;
+    --panel-2: #f1f3f6;   /* 밝은 테마에서는 반대로 위로 갈수록 살짝 어둡습니다 */
+    --line: #e4e7ec;
+    --line-2: #cfd4dc;
+    --text: #171a20;
+    --muted: #5f6773;
+    --faint: #7d8694;   /* 흐린 글자도 최소 3:1 대비는 지킵니다 */
+    --final: #0b0d11;   /* 밝은 테마에서는 진한 검정 */
+    --interim: #868f9e;
     --accent: #2563eb;
-    --ok: #087443;
+    --ok: #0a7a48;
     --fail: #c92a2a;
   }
+
+  /* 한 화면에 담기는 폭. 와이드 모니터에서 드롭다운이 끝까지 늘어나는 걸 막습니다. */
+  :root { --wrap: 900px; }
 
   * { box-sizing: border-box; }
   html, body { height: 100%; }
@@ -39,11 +56,22 @@
     margin: 0;
     background: var(--bg);
     color: var(--text);
-    font-family: "Segoe UI", "Malgun Gothic", system-ui, sans-serif;
-    line-height: 1.55;
+    /* 한글이 잘 나오는 차례로 늘어놓았습니다.
+       Segoe UI 에는 한글이 없어서 글자마다 맑은 고딕으로 자동으로 넘어갑니다. */
+    font-family: "Segoe UI", "Malgun Gothic", "Apple SD Gothic Neo",
+                 "Noto Sans KR", system-ui, sans-serif;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
     display: flex;
     flex-direction: column;
-    transition: background .15s, color .15s;
+  }
+
+  /* ★ 가운데 900px 안에만 내용을 담습니다.
+     머리말·본문·바닥글의 배경은 화면 끝까지 가되, 안의 내용만 가운데로 모입니다. */
+  header > *, footer > * {
+    max-width: var(--wrap);
+    margin-left: auto;
+    margin-right: auto;
   }
 
   /* ══ 상단 ══ */
@@ -51,21 +79,28 @@
     flex: 0 0 auto;
     background: var(--panel);
     border-bottom: 1px solid var(--line);
-    padding: 10px 16px 12px;
+    padding: 14px 20px 16px;
   }
+  /* 탭 — 큰 사각형 세 개 대신 작은 묶음 하나로.
+     width:max-content 라서 글자 길이만큼만 차지하고, 좌우 auto 여백으로 가운데에 옵니다. */
   .tabs {
     display: flex;
-    gap: 6px;
-    margin-bottom: 10px;
+    gap: 2px;
+    width: max-content;
+    padding: 3px;
+    margin-bottom: 14px;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 11px;
   }
   .tab {
-    flex: 1 1 0;
-    padding: 9px 0;
-    background: var(--panel-2);
+    flex: 0 0 auto;
+    padding: 6px 18px;
+    background: transparent;
     color: var(--muted);
-    border: 1px solid var(--line);
+    border: 0;
     border-radius: 8px;
-    font-size: 14px;
+    font-size: 13.5px;
     font-weight: 600;
     font-family: inherit;
     cursor: pointer;
@@ -73,7 +108,6 @@
   .tab:hover { color: var(--text); }
   .tab.active {
     background: var(--accent);
-    border-color: var(--accent);
     color: #fff;
   }
 
@@ -87,30 +121,32 @@
   .notice {
     margin: auto;          /* 세로 가운데 정렬 (말하기 화면이 flex 라서 이렇게 됩니다) */
     max-width: 420px;
-    padding: 16px 18px;
+    padding: 20px 22px;
     border: 1px solid var(--line);
-    border-radius: 12px;
+    border-radius: 16px;
     background: var(--panel);
     color: var(--text);
     font-size: 13.5px;
-    line-height: 1.6;
+    line-height: 1.65;
     text-align: center;
   }
   .notice b { color: var(--fail); }
-  .notice .sub { display: block; color: var(--muted); font-size: 12.5px; margin-top: 8px; }
+  .notice .sub { display: block; color: var(--muted); font-size: 12.5px; margin-top: 10px; }
 
   /* 상단 배지 — 한도 초과 같은 알림. 사용을 막지 않고 잠깐 알리기만 합니다. */
   #badge {
     display: none;
-    padding: 7px 12px;
-    border-bottom: 1px solid var(--line);
-    background: var(--panel);
+    margin-top: 12px;
+    padding: 8px 14px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--panel-2);
     color: var(--muted);
     font-size: 12px;
     text-align: center;
   }
   #badge.show { display: block; }
-  #badge.warn { color: var(--fail); }
+  #badge.warn { color: var(--fail); border-color: var(--fail); }
 
   /* 자막 줄 안의 작은 실패 표시 */
   .caption .dst.failed::before {
@@ -119,86 +155,105 @@
   select {
     flex: 1 1 0;
     min-width: 0;
-    padding: 9px 10px;
+    padding: 10px 12px;
     background: var(--panel-2);
     color: var(--text);
     border: 1px solid var(--line);
-    border-radius: 8px;
+    border-radius: 10px;
     font-size: 14px;
     font-family: inherit;
+    cursor: pointer;
   }
+  select:hover { border-color: var(--line-2); }
   select:focus { outline: none; border-color: var(--accent); }
   #swapBtn {
     flex: 0 0 auto;
-    width: 42px; height: 38px;
+    width: 42px; height: 42px;
     background: var(--panel-2);
-    color: var(--text);
+    color: var(--muted);
     border: 1px solid var(--line);
-    border-radius: 8px;
-    font-size: 16px;
+    border-radius: 10px;
+    font-size: 15px;
     cursor: pointer;
   }
   #swapBtn:hover { border-color: var(--accent); color: var(--accent); }
 
   /* ══ 가운데 ══ */
-  main { flex: 1 1 auto; overflow-y: auto; padding: 14px 16px; }
+  main {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    width: 100%;
+    max-width: var(--wrap);   /* ★ 와이드 모니터에서 내용이 끝까지 늘어나지 않게 */
+    margin: 0 auto;
+    padding: 18px 20px 22px;
+  }
   .view { display: none; }
   .view.active { display: block; }
   .empty { color: var(--muted); font-size: 13.5px; text-align: center; margin-top: 40px; }
 
-  /* ── 자막 ── */
+  /* ── 자막 ──────────────────────────────────────────────────
+     ★ 읽기 편한 것이 예쁜 것보다 먼저입니다.
+       번역문이 주인공이라 가장 크고 진하게, 원문은 참고용이라 작고 흐리게. */
   .caption {
     border-bottom: 1px solid var(--line);
-    padding: 12px 4px;
+    padding: 14px 2px;
   }
   .caption:last-of-type { border-bottom: 0; }
-  .caption .src {
-    color: var(--final);
-    font-weight: 600;
+  .caption .src {                 /* 원문 — 보조 */
+    color: var(--muted);
+    font-weight: 400;
+    line-height: 1.5;
     word-break: break-word;
   }
-  .caption .dst {
-    color: var(--accent);
-    margin-top: 5px;
+  .caption .dst {                 /* 번역문 — 주인공 */
+    color: var(--final);
+    font-weight: 600;
+    line-height: 1.5;
+    margin-top: 7px;
     word-break: break-word;
     cursor: pointer;
   }
-  .caption .dst.waiting { color: var(--muted); font-style: italic; cursor: default; }
-  .caption .dst.failed  { color: var(--fail); cursor: default; }
-  .caption .when { color: var(--muted); font-size: 11.5px; margin-top: 5px; }
+  .caption .dst:hover { color: var(--accent); }   /* 누르면 복사된다는 신호 */
+  .caption .dst.waiting { color: var(--muted); font-weight: 400; font-style: italic; cursor: default; }
+  .caption .dst.failed  { color: var(--fail); font-weight: 500; cursor: default; }
+  .caption .dst.failed:hover { color: var(--fail); }
+  .caption .when { color: var(--faint); font-size: 11.5px; margin-top: 7px; }
 
   /* 중간 결과 — 아직 확정되지 않은 말. 흐린 회색 */
   #interim {
     color: var(--interim);
-    padding: 12px 4px;
+    padding: 12px 2px;
+    line-height: 1.5;
     word-break: break-word;
     min-height: 1.6em;
   }
   #interim:empty { display: none; }
 
-  /* 자막 글자 크기 (설정에서 바뀝니다) */
-  body[data-capsize="s"] .caption .src, body[data-capsize="s"] #interim { font-size: 15px; }
-  body[data-capsize="s"] .caption .dst { font-size: 14px; }
-  body[data-capsize="m"] .caption .src, body[data-capsize="m"] #interim { font-size: 19px; }
-  body[data-capsize="m"] .caption .dst { font-size: 17px; }
-  body[data-capsize="l"] .caption .src, body[data-capsize="l"] #interim { font-size: 24px; }
-  body[data-capsize="l"] .caption .dst { font-size: 21px; }
-  body[data-capsize="xl"] .caption .src, body[data-capsize="xl"] #interim { font-size: 31px; }
-  body[data-capsize="xl"] .caption .dst { font-size: 26px; }
+  /* 자막 글자 크기 (설정에서 바뀝니다)
+     ※ 번역문(.dst)이 원문(.src)보다 큽니다. 예전과 반대입니다.
+       PiP 창 쪽 크기표는 js/subtitle.js 의 PIP_SIZE_PX 에 같은 값이 있습니다. */
+  body[data-capsize="s"] .caption .src, body[data-capsize="s"] #interim { font-size: 14px; }
+  body[data-capsize="s"] .caption .dst { font-size: 15px; }
+  body[data-capsize="m"] .caption .src, body[data-capsize="m"] #interim { font-size: 16px; }
+  body[data-capsize="m"] .caption .dst { font-size: 19px; }
+  body[data-capsize="l"] .caption .src, body[data-capsize="l"] #interim { font-size: 19px; }
+  body[data-capsize="l"] .caption .dst { font-size: 24px; }
+  body[data-capsize="xl"] .caption .src, body[data-capsize="xl"] #interim { font-size: 24px; }
+  body[data-capsize="xl"] .caption .dst { font-size: 31px; }
 
   /* ── 채팅 카드 ── */
   .item {
     background: var(--panel);
     border: 1px solid var(--line);
-    border-radius: 10px;
-    padding: 12px 14px;
+    border-radius: 14px;
+    padding: 14px 16px;
     margin-bottom: 10px;
     cursor: pointer;
   }
-  .item:hover { border-color: var(--accent); }
-  .item .orig { color: var(--muted); font-size: 12.5px; margin-bottom: 6px; word-break: break-word; }
-  .item .trans { font-size: 16px; word-break: break-word; }
-  .item .meta { margin-top: 8px; font-size: 11.5px; color: var(--muted); }
+  .item:hover { border-color: var(--line-2); }
+  .item .orig { color: var(--muted); font-size: 12.5px; margin-bottom: 7px; word-break: break-word; }
+  .item .trans { font-size: 16.5px; font-weight: 500; word-break: break-word; }
+  .item .meta { margin-top: 9px; font-size: 11.5px; color: var(--faint); }
   .item.error { border-color: var(--fail); cursor: default; }
   .item.error .trans { color: var(--fail); font-size: 14px; }
   .item.pending { opacity: .6; cursor: default; }
@@ -208,15 +263,15 @@
   .setting {
     background: var(--panel);
     border: 1px solid var(--line);
-    border-radius: 10px;
-    padding: 13px 15px;
-    margin-bottom: 10px;
+    border-radius: 14px;
+    padding: 16px 18px;
+    margin-bottom: 12px;
   }
-  .setting h3 { margin: 0 0 3px; font-size: 14px; }
-  .setting p { margin: 0 0 10px; font-size: 12.5px; color: var(--muted); }
+  .setting h3 { margin: 0 0 4px; font-size: 14px; font-weight: 600; }
+  .setting p { margin: 0 0 12px; font-size: 12.5px; color: var(--muted); line-height: 1.55; }
   .setting .controls { display: flex; gap: 7px; flex-wrap: wrap; }
   .chip {
-    padding: 7px 14px;
+    padding: 7px 15px;
     background: var(--panel-2);
     color: var(--muted);
     border: 1px solid var(--line);
@@ -225,14 +280,16 @@
     font-family: inherit;
     cursor: pointer;
   }
+  .chip:hover { color: var(--text); border-color: var(--line-2); }
   .chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .chip.on:hover { color: #fff; }
   .gauge {
     height: 8px;
     background: var(--panel-2);
     border: 1px solid var(--line);
     border-radius: 999px;
     overflow: hidden;
-    margin: 8px 0 6px;
+    margin: 10px 0 6px;
   }
   .gauge > span { display: block; height: 100%; background: var(--ok); width: 0; }
   .gauge.high > span { background: var(--fail); }
@@ -242,50 +299,62 @@
     flex: 0 0 auto;
     background: var(--panel);
     border-top: 1px solid var(--line);
-    padding: 12px 16px 14px;
+    padding: 14px 20px 16px;
   }
   .bar { display: none; }
   .bar.active { display: flex; gap: 8px; align-items: flex-end; }
+  #speakBar.active { align-items: center; }   /* 높이가 다른 버튼들을 가운데로 맞춥니다 */
 
   textarea {
     flex: 1 1 auto;
     resize: none;
-    min-height: 44px; max-height: 140px;
-    padding: 11px 12px;
+    min-height: 46px; max-height: 140px;
+    padding: 12px 14px;
     background: var(--panel-2);
     color: var(--text);
     border: 1px solid var(--line);
-    border-radius: 8px;
+    border-radius: 12px;
     font-size: 15px;
     font-family: inherit;
-    line-height: 1.4;
+    line-height: 1.45;
   }
   textarea:focus { outline: none; border-color: var(--accent); }
 
+  /* ── 버튼 위계 ────────────────────────────────────────────
+     .btn      = 주 동작 (시작 / 정지 / 번역) — 크고 뚜렷하게
+     .btn.sub  = 보조 동작 (지우기 / PiP 창) — 작고 조용하게 */
   .btn {
     flex: 0 0 auto;
-    height: 44px;
-    padding: 0 18px;
+    height: 46px;
+    padding: 0 20px;
     background: var(--accent);
     color: #fff;
-    border: 0;
-    border-radius: 8px;
+    border: 1px solid transparent;
+    border-radius: 12px;
     font-size: 15px;
     font-weight: 700;
     font-family: inherit;
     cursor: pointer;
   }
+  .btn.rec { background: var(--fail); }
   .btn.sub {
-    background: var(--panel-2);
-    color: var(--text);
+    height: 38px;
+    padding: 0 14px;
+    background: transparent;
+    color: var(--muted);
     border: 1px solid var(--line);
+    font-size: 13px;
     font-weight: 600;
   }
-  .btn.rec { background: var(--fail); }
-  .btn:disabled { opacity: .45; cursor: default; }
-  #speakBar .btn { flex: 1 1 0; }
+  .btn.sub:hover { color: var(--text); border-color: var(--line-2); }
+  .btn:disabled { opacity: .4; cursor: default; }
+  .btn.sub:disabled:hover { color: var(--muted); border-color: var(--line); }
 
-  .hint { font-size: 11.5px; color: var(--muted); margin-top: 7px; }
+  /* 주 동작만 가로로 늘어나고, 보조 동작은 글자 크기만큼만 차지합니다 */
+  #speakBar .btn { flex: 1 1 0; }
+  #speakBar .btn.sub { flex: 0 0 auto; }
+
+  .hint { font-size: 11.5px; color: var(--faint); margin-top: 9px; }
   #status { font-size: 12px; margin-top: 6px; min-height: 17px; }
   #status.err { color: var(--fail); }
   #status.ok { color: var(--ok); }
